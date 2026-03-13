@@ -105,23 +105,34 @@ export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected
           //   Claude Code v2.1.74
           //   Opus 4.6 · Claude Team
           //   ~\Boswell\Projects\Terradome
+          // But long paths get truncated with "…" so we also check the PS prompt
           if (/claude\s*code/i.test(stripped)) {
-            // Try multiple path patterns
-            const patterns = [
-              /~[\\\/][\w.\\\/ -]+/,                    // ~\path or ~/path
-              /[A-Z]:[\\\/][\w.\\\/ -]+/,               // C:\path
-              /\/[a-z]\/[\w.\\\/ -]+/,                   // /c/Users/...
-            ];
+            // First try the full path from the PS prompt (most reliable, not truncated)
+            const psPrompt = stripped.match(/PS\s+([A-Z]:[\\\/][^>\r\n]*)>\s/i);
+            if (psPrompt) {
+              claudeDetectedRef.current = true;
+              const cwd = psPrompt[1].trim();
+              const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
+              console.log("[Hivemind] Renaming terminal from PS prompt, path:", cwd, "-> folder:", folder);
+              onClaudeDetected(id, folder);
+            } else {
+              // Fallback: try Claude's banner path (may be truncated)
+              const patterns = [
+                /~[\\\/][\w.\\\/ -]+/,                    // ~\path or ~/path
+                /[A-Z]:[\\\/][\w.\\\/ -]+/,               // C:\path
+                /\/[a-z]\/[\w.\\\/ -]+/,                   // /c/Users/...
+              ];
 
-            for (const pattern of patterns) {
-              const match = stripped.match(pattern);
-              if (match) {
-                claudeDetectedRef.current = true;
-                const cwd = match[0].trim();
-                const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
-                console.log("[Hivemind] Renaming terminal, matched path:", cwd, "-> folder:", folder);
-                onClaudeDetected(id, folder);
-                break;
+              for (const pattern of patterns) {
+                const match = stripped.match(pattern);
+                if (match) {
+                  claudeDetectedRef.current = true;
+                  const cwd = match[0].trim();
+                  const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
+                  console.log("[Hivemind] Renaming terminal from banner, path:", cwd, "-> folder:", folder);
+                  onClaudeDetected(id, folder);
+                  break;
+                }
               }
             }
           }

@@ -27,6 +27,8 @@ interface HivemindAPI {
   updateTerminals: (terminals: Array<{ id: string; title: string }>) => Promise<void>;
   saveSession: (terminals: Array<{ id: string; title: string; cwd?: string; hadClaude?: boolean }>) => void;
   getSession: () => Promise<Array<{ title: string; cwd: string; hadClaude: boolean }>>;
+  registerMomma: (id: string) => void;
+  unregisterMomma: () => void;
 }
 
 declare global {

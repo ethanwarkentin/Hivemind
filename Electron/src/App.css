@@ -819,3 +819,82 @@
   accent-color: #7aa2f7;
   cursor: pointer;
 }
+
+/* Focus mode */
+.app__focus-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  z-index: 901;
+  background: #16171e;
+  border-bottom: 2px solid #7aa2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.app__focus-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7aa2f7;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+.app__focus-hints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app__focus-hint {
+  font-size: 11px;
+  color: #565f89;
+}
+
+.app__focus-exit {
+  background: #292e42;
+  color: #a9b1d6;
+  border: none;
+  padding: 4px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app__focus-exit:hover {
+  background: #7aa2f7;
+  color: #1a1b26;
+}
+
+.app__grid-cell--focused {
+  position: fixed !important;
+  inset: 0;
+  top: 36px;
+  z-index: 900;
+  border: none !important;
+}
+
+.app__grid-cell--focused .app__grid-header {
+  display: none;
+}
+
+.momma--focused {
+  position: fixed !important;
+  inset: 0;
+  top: 36px;
+  z-index: 900;
+  border: none !important;
+}
+
+.momma--focused .momma__header {
+  display: none;
+}
+
+.momma--focused .momma__terminal {
+  height: 100%;
+}

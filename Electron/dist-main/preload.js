@@ -28,6 +28,8 @@ const hivemindAPI = {
     updateTerminals: (terminals) => electron_1.ipcRenderer.invoke("hivemind:updateTerminals", terminals),
     saveSession: (terminals) => electron_1.ipcRenderer.send("hivemind:saveSession", terminals),
     getSession: () => electron_1.ipcRenderer.invoke("hivemind:getSession"),
+    registerMomma: (id) => electron_1.ipcRenderer.send("hivemind:registerMomma", { id }),
+    unregisterMomma: () => electron_1.ipcRenderer.send("hivemind:unregisterMomma"),
 };
 electron_1.contextBridge.exposeInMainWorld("terminal", terminalAPI);
 electron_1.contextBridge.exposeInMainWorld("settings", settingsAPI);

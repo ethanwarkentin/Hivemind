@@ -32,6 +32,7 @@ export default function App() {
   const [mommaCollapsed, setMommaCollapsed] = useState(false);
   const [restoreSession, setRestoreSession] = useState(true);
   const [autoStartMomma, setAutoStartMomma] = useState(false);
+  const [focusedId, setFocusedId] = useState<string | null>(null); // terminal id or "momma"
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -96,6 +97,23 @@ export default function App() {
     setRestoreSession(enabled);
     window.settings.set("restoreSession", enabled);
   }, []);
+
+  // Escape key exits focus mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && focusedId) {
+        setFocusedId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [focusedId]);
+
+  // Sidebar select exits focus mode
+  const handleSidebarSelect = useCallback((id: string) => {
+    if (focusedId) setFocusedId(null);
+    setActiveTab(id);
+  }, [focusedId]);
 
   const handleAutoStartMommaChange = useCallback((enabled: boolean) => {
     setAutoStartMomma(enabled);
@@ -216,6 +234,13 @@ export default function App() {
         t.id === id ? { ...t, title: `${getClaudeName()} - ${folder}`, hadClaude: true } : t
       )
     );
+    // Auto-deliver the worker protocol to the new Claude
+    window.hivemind.getDir().then((dir) => {
+      const protocolPath = `${dir.replace(/\\/g, "/")}/worker-protocol.md`;
+      setTimeout(() => {
+        window.terminal.write(id, `Read and follow the Hivemind worker protocol at: ${protocolPath}\r`);
+      }, 2000);
+    });
   }, []);
 
   const onCwdChange = useCallback((id: string, cwd: string) => {
@@ -250,7 +275,7 @@ export default function App() {
         collapsed={sidebarCollapsed}
         defaultCwd={defaultCwd}
         fontSize={fontSize}
-        onSelect={setActiveTab}
+        onSelect={handleSidebarSelect}
         onClose={closeTerminal}
         onCloseAll={closeAllTerminals}
         onNew={createTerminal}
@@ -268,7 +293,9 @@ export default function App() {
           fontSize={fontSize}
           collapsed={mommaCollapsed}
           autoStart={settingsLoaded && autoStartMomma}
+          focused={focusedId === "momma"}
           onToggleCollapse={() => setMommaCollapsed((prev) => !prev)}
+          onDoubleClick={() => setFocusedId((prev) => (prev === "momma" ? null : "momma"))}
         />
         <div className="app__content">
           {closing && (
@@ -289,10 +316,10 @@ export default function App() {
               {visibleTabs.map((tab) => (
                 <div
                   key={tab.id}
-                  className={`app__grid-cell ${tab.id === activeTab ? "app__grid-cell--active" : ""}`}
+                  className={`app__grid-cell ${tab.id === activeTab ? "app__grid-cell--active" : ""} ${focusedId === tab.id ? "app__grid-cell--focused" : ""}`}
                   onClick={() => setActiveTab(tab.id)}
                 >
-                  <div className="app__grid-header">
+                  <div className="app__grid-header" onDoubleClick={() => setFocusedId((prev) => (prev === tab.id ? null : tab.id))}>
                     <span className="app__grid-title">{tab.title}</span>
                     <button
                       className="app__grid-close"
@@ -320,6 +347,21 @@ export default function App() {
           onConfirm={confirmClose}
           onCancel={cancelClose}
         />
+      )}
+      {focusedId && (
+        <div className="app__focus-overlay">
+          <div className="app__focus-header">
+            <span className="app__focus-title">
+              {focusedId === "momma" ? "ClaudeMomma" : tabs.find((t) => t.id === focusedId)?.title || "Terminal"}
+            </span>
+            <div className="app__focus-hints">
+              <span className="app__focus-hint">Esc or double-click to exit</span>
+              <button className="app__focus-exit" onClick={() => setFocusedId(null)} title="Exit focus (Esc)">
+                Exit Focus
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

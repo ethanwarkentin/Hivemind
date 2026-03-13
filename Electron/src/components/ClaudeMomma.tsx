@@ -5,7 +5,9 @@ interface ClaudeMommaProps {
   fontSize: number;
   collapsed: boolean;
   autoStart: boolean;
+  focused: boolean;
   onToggleCollapse: () => void;
+  onDoubleClick: () => void;
 }
 
 type MommaState = "idle" | "checking" | "booting" | "running" | "error";
@@ -32,7 +34,7 @@ function getBootingMessage() {
   return bootingMessages[Math.floor(Math.random() * bootingMessages.length)];
 }
 
-export default function ClaudeMomma({ fontSize, collapsed, autoStart, onToggleCollapse }: ClaudeMommaProps) {
+export default function ClaudeMomma({ fontSize, collapsed, autoStart, focused, onToggleCollapse, onDoubleClick }: ClaudeMommaProps) {
   const [state, setState] = useState<MommaState>("idle");
   const [terminalId, setTerminalId] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -67,6 +69,7 @@ export default function ClaudeMomma({ fontSize, collapsed, autoStart, onToggleCo
     const dir = await window.hivemind.getDir();
     const result = await window.terminal.create({ cols: 80, rows: 10, cwd: dir });
     setTerminalId(result.id);
+    window.hivemind.registerMomma(result.id);
 
     // Listen for output to detect when Claude is ready
     const handleData = (payload: { id: string; data: string }) => {
@@ -103,6 +106,7 @@ export default function ClaudeMomma({ fontSize, collapsed, autoStart, onToggleCo
 
   const stopMomma = useCallback(() => {
     if (terminalId) {
+      window.hivemind.unregisterMomma();
       window.terminal.kill(terminalId);
       setTerminalId("");
       setState("idle");
@@ -157,7 +161,7 @@ export default function ClaudeMomma({ fontSize, collapsed, autoStart, onToggleCo
   }
 
   return (
-    <div className="momma">
+    <div className={`momma ${focused ? "momma--focused" : ""}`} onDoubleClick={onDoubleClick}>
       <div className="momma__header">
         <div className="momma__title-row">
           <span className="momma__title">ClaudeMomma</span>

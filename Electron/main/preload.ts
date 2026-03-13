@@ -51,8 +51,10 @@ export interface HivemindAPI {
   getDir: () => Promise<string>;
   checkClaude: () => Promise<{ installed: boolean; version: string }>;
   updateTerminals: (terminals: Array<{ id: string; title: string }>) => Promise<void>;
-  saveSession: (terminals: Array<{ id: string; title: string }>) => void;
-  getSession: () => Promise<Array<{ title: string; cwd: string }>>;
+  saveSession: (terminals: Array<{ id: string; title: string; cwd?: string; hadClaude?: boolean }>) => void;
+  getSession: () => Promise<Array<{ title: string; cwd: string; hadClaude: boolean }>>;
+  registerMomma: (id: string) => void;
+  unregisterMomma: () => void;
 }
 
 const hivemindAPI: HivemindAPI = {
@@ -61,6 +63,8 @@ const hivemindAPI: HivemindAPI = {
   updateTerminals: (terminals) => ipcRenderer.invoke("hivemind:updateTerminals", terminals),
   saveSession: (terminals) => ipcRenderer.send("hivemind:saveSession", terminals),
   getSession: () => ipcRenderer.invoke("hivemind:getSession"),
+  registerMomma: (id) => ipcRenderer.send("hivemind:registerMomma", { id }),
+  unregisterMomma: () => ipcRenderer.send("hivemind:unregisterMomma"),
 };
 
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
