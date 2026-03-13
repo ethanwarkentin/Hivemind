@@ -10,11 +10,17 @@ export interface TerminalAPI {
   write: (id: string, data: string) => void;
   resize: (id: string, cols: number, rows: number) => void;
   kill: (id: string) => void;
+  checkClaude: (id: string) => Promise<boolean>;
   onData: (callback: (payload: { id: string; data: string }) => void) => void;
   onExit: (
     callback: (payload: { id: string; exitCode: number }) => void
   ) => void;
   removeAllListeners: () => void;
+}
+
+export interface SettingsAPI {
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number }>;
+  set: (key: string, value: unknown) => void;
 }
 
 const terminalAPI: TerminalAPI = {
@@ -23,6 +29,7 @@ const terminalAPI: TerminalAPI = {
   resize: (id, cols, rows) =>
     ipcRenderer.send("terminal:resize", { id, cols, rows }),
   kill: (id) => ipcRenderer.send("terminal:kill", { id }),
+  checkClaude: (id) => ipcRenderer.invoke("terminal:checkClaude", { id }),
   onData: (callback) => {
     ipcRenderer.on("terminal:data", (_event, payload) => callback(payload));
   },
@@ -35,4 +42,10 @@ const terminalAPI: TerminalAPI = {
   },
 };
 
+const settingsAPI: SettingsAPI = {
+  get: () => ipcRenderer.invoke("settings:get"),
+  set: (key, value) => ipcRenderer.send("settings:set", { key, value }),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
+contextBridge.exposeInMainWorld("settings", settingsAPI);

@@ -6,42 +6,25 @@ import "@xterm/xterm/css/xterm.css";
 interface TerminalProps {
   id: string;
   isActive: boolean;
+  fontSize?: number;
+  onClaudeDetected?: (id: string, cwd: string) => void;
 }
 
-export default function Terminal({ id, isActive }: TerminalProps) {
+export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const claudeDetectedRef = useRef(false);
+  const outputBufferRef = useRef("");
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const xterm = new XTerm({
       cursorBlink: true,
-      fontSize: 14,
+      fontSize,
       fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-      theme: {
-        background: "#1a1b26",
-        foreground: "#a9b1d6",
-        cursor: "#c0caf5",
-        selectionBackground: "#33467c",
-        black: "#15161e",
-        red: "#f7768e",
-        green: "#9ece6a",
-        yellow: "#e0af68",
-        blue: "#7aa2f7",
-        magenta: "#bb9af7",
-        cyan: "#7dcfff",
-        white: "#a9b1d6",
-        brightBlack: "#414868",
-        brightRed: "#f7768e",
-        brightGreen: "#9ece6a",
-        brightYellow: "#e0af68",
-        brightBlue: "#7aa2f7",
-        brightMagenta: "#bb9af7",
-        brightCyan: "#7dcfff",
-        brightWhite: "#c0caf5",
-      },
+      theme: {},
     });
 
     const fitAddon = new FitAddon();
@@ -68,6 +51,53 @@ export default function Terminal({ id, isActive }: TerminalProps) {
     const handleData = (payload: { id: string; data: string }) => {
       if (payload.id === id) {
         xterm.write(payload.data);
+
+        // Watch for Claude startup - look for the cwd path Claude prints
+        if (!claudeDetectedRef.current && onClaudeDetected) {
+          outputBufferRef.current += payload.data;
+          // Keep buffer from growing forever
+          if (outputBufferRef.current.length > 5000) {
+            outputBufferRef.current = outputBufferRef.current.slice(-3000);
+          }
+
+          // Strip all ANSI escape sequences (including OSC, CSI, etc.)
+          const stripped = outputBufferRef.current
+            .replace(/\x1b\][^\x07]*\x07/g, "")      // OSC sequences
+            .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")   // CSI sequences
+            .replace(/\x1b[()][A-Z0-9]/g, "")          // Character set
+            .replace(/\x1b=/g, "")                      // Keypad mode
+            .replace(/\x1b>/g, "");                     // Keypad mode
+
+          // Debug: log to console so we can see what's happening
+          if (/claude/i.test(stripped) && !claudeDetectedRef.current) {
+            console.log("[Hivemind] Claude detected in output, stripped text:", JSON.stringify(stripped.slice(-500)));
+          }
+
+          // Claude Code prints something like:
+          //   Claude Code v2.1.74
+          //   Opus 4.6 · Claude Team
+          //   ~\Boswell\Projects\Terradome
+          if (/claude\s*code/i.test(stripped)) {
+            // Try multiple path patterns
+            const patterns = [
+              /~[\\\/][\w.\\\/ -]+/,                    // ~\path or ~/path
+              /[A-Z]:[\\\/][\w.\\\/ -]+/,               // C:\path
+              /\/[a-z]\/[\w.\\\/ -]+/,                   // /c/Users/...
+            ];
+
+            for (const pattern of patterns) {
+              const match = stripped.match(pattern);
+              if (match) {
+                claudeDetectedRef.current = true;
+                const cwd = match[0].trim();
+                const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
+                console.log("[Hivemind] Renaming terminal, matched path:", cwd, "-> folder:", folder);
+                onClaudeDetected(id, folder);
+                break;
+              }
+            }
+          }
+        }
       }
     };
     window.terminal.onData(handleData);
@@ -95,7 +125,7 @@ export default function Terminal({ id, isActive }: TerminalProps) {
       resizeObserver.disconnect();
       xterm.dispose();
     };
-  }, [id]);
+  }, [id, onClaudeDetected]);
 
   // Focus when tab becomes active
   useEffect(() => {
