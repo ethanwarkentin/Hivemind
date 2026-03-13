@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, IpcMainEvent } from "electron";
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, IpcMainEvent, dialog } from "electron";
 import * as path from "path";
 import * as os from "os";
 import * as pty from "node-pty";
@@ -7,6 +7,11 @@ import { execSync } from "child_process";
 const Store = require("electron-store").default;
 
 const isDev = !app.isPackaged;
+
+// Separate dev and production data so they don't interfere with each other
+if (isDev) {
+  app.setPath("userData", path.join(app.getPath("userData"), "-dev"));
+}
 
 // ── Persistent settings ───────────────────────────────────────
 
@@ -23,6 +28,7 @@ interface AppSettings {
   windowMaximized: boolean;
   fontSize: number;
   restoreSession: boolean;
+  theme: string;
   session: SessionTerminal[];
 }
 
@@ -34,6 +40,7 @@ const store = new Store({
     windowMaximized: true,
     fontSize: 14,
     restoreSession: true,
+    theme: "dark",
     session: [],
   },
 });
@@ -61,7 +68,7 @@ function createWindow(): void {
     minWidth: 600,
     minHeight: 400,
     title: "Hivemind",
-    backgroundColor: "#1a1b26",
+    backgroundColor: "#0d0e14",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -104,7 +111,19 @@ ipcMain.handle("settings:get", () => {
     defaultCwd: store.get("defaultCwd"),
     fontSize: store.get("fontSize"),
     restoreSession: store.get("restoreSession"),
+    theme: store.get("theme"),
   };
+});
+
+ipcMain.handle("settings:browseFolder", async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  if (!win) return null;
+  const result = await dialog.showOpenDialog(win, {
+    properties: ["openDirectory"],
+    title: "Select Default Directory",
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
 });
 
 // ── Session persistence ──────────────────────────────────────

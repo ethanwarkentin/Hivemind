@@ -19,8 +19,9 @@ export interface TerminalAPI {
 }
 
 export interface SettingsAPI {
-  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean }>;
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string }>;
   set: (key: string, value: unknown) => void;
+  browseFolder: () => Promise<string | null>;
 }
 
 export interface HivemindAPI {
@@ -50,6 +51,7 @@ const terminalAPI: TerminalAPI = {
 const settingsAPI: SettingsAPI = {
   get: () => ipcRenderer.invoke("settings:get"),
   set: (key, value) => ipcRenderer.send("settings:set", { key, value }),
+  browseFolder: () => ipcRenderer.invoke("settings:browseFolder"),
 };
 
 const hivemindAPI: HivemindAPI = {

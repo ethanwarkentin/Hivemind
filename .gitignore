@@ -419,3 +419,8 @@ mcp_stdout.txt
 
 # Azure Functions local settings
 **/local.settings.json
+
+# Electron build outputs
+Electron/dist/
+Electron/dist-main/
+Electron/release/

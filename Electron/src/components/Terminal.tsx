@@ -7,11 +7,39 @@ interface TerminalProps {
   id: string;
   isActive: boolean;
   fontSize?: number;
+  theme?: string;
   onClaudeDetected?: (id: string, cwd: string) => void;
   onCwdChange?: (id: string, cwd: string) => void;
 }
 
-export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected, onCwdChange }: TerminalProps) {
+const darkTheme = {};
+
+const paulinoTheme = {
+  background: "#ffffff",
+  foreground: "#1a0015",
+  cursor: "#ff00ff",
+  cursorAccent: "#ffffff",
+  selectionBackground: "#ff69b480",
+  selectionForeground: "#1a0015",
+  black: "#1a0015",
+  red: "#ff0000",
+  green: "#00aa00",
+  yellow: "#cc8800",
+  blue: "#0066ff",
+  magenta: "#ff00ff",
+  cyan: "#00aaaa",
+  white: "#e0dcd0",
+  brightBlack: "#6b0058",
+  brightRed: "#ff3333",
+  brightGreen: "#00cc00",
+  brightYellow: "#ffaa00",
+  brightBlue: "#3388ff",
+  brightMagenta: "#ff44ff",
+  brightCyan: "#00cccc",
+  brightWhite: "#ffffff",
+};
+
+export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", onClaudeDetected, onCwdChange }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -26,7 +54,7 @@ export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected
       cursorBlink: true,
       fontSize,
       fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-      theme: {},
+      theme: theme === "paulino" ? paulinoTheme : darkTheme,
       rightClickSelectsWord: false,
     });
 
@@ -170,6 +198,13 @@ export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected
       xterm.dispose();
     };
   }, [id, onClaudeDetected]);
+
+  // Update terminal theme dynamically
+  useEffect(() => {
+    if (xtermRef.current) {
+      xtermRef.current.options.theme = theme === "paulino" ? paulinoTheme : darkTheme;
+    }
+  }, [theme]);
 
   // Focus when tab becomes active
   useEffect(() => {
