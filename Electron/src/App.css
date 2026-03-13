@@ -38,6 +38,86 @@
   color: #7aa2f7;
 }
 
+/* Collapsed sidebar items */
+.sidebar__list--collapsed {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  gap: 2px;
+}
+
+.sidebar__icon-item {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  background: #292e42;
+  color: #565f89;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar__icon-item:hover {
+  background: #1e1f2b;
+  color: #a9b1d6;
+}
+
+.sidebar__icon-item--active {
+  background: #3d59a1;
+  color: #c0caf5;
+}
+
+.sidebar__actions--collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid #292e42;
+}
+
+.sidebar__icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar__icon-btn--close {
+  background: none;
+  color: #f7768e;
+}
+
+.sidebar__icon-btn--close:hover {
+  background: #f7768e;
+  color: #1a1b26;
+}
+
+.sidebar__icon-btn--new {
+  background: none;
+  color: #9ece6a;
+}
+
+.sidebar__icon-btn--new:hover {
+  background: #9ece6a;
+  color: #1a1b26;
+}
+
 .sidebar__header {
   padding: 14px 16px;
   border-bottom: 1px solid #292e42;
@@ -224,7 +304,7 @@
   background: #1e1f2b;
 }
 
-.sidebar__close-all {
+.sidebar__add {
   border-bottom: 1px solid #292e42;
 }
 
@@ -370,6 +450,34 @@
 .app__empty-btn:hover {
   background: #7aa2f7;
   color: #1a1b26;
+}
+
+/* Loading overlay */
+.app__loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 500;
+  color: #565f89;
+  font-size: 14px;
+}
+
+.app__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #292e42;
+  border-top-color: #7aa2f7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Confirm modal */

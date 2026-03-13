@@ -56,6 +56,26 @@ export default function Sidebar({
         <button className="sidebar__expand" onClick={onToggleCollapse} title="Expand sidebar">
           &#9654;
         </button>
+        <div className="sidebar__list sidebar__list--collapsed">
+          {tabs.map((tab, index) => (
+            <button
+              key={tab.id}
+              className={`sidebar__icon-item ${tab.id === activeTab ? "sidebar__icon-item--active" : ""}`}
+              onClick={() => onSelect(tab.id)}
+              title={tab.title}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
+        <div className="sidebar__actions sidebar__actions--collapsed">
+          <button className="sidebar__icon-btn sidebar__icon-btn--new" onClick={onNew} title="New terminal">
+            &#43;
+          </button>
+          <button className="sidebar__icon-btn sidebar__icon-btn--close" onClick={onCloseAll} title="Close all terminals">
+            &#10005;
+          </button>
+        </div>
       </div>
     );
   }
@@ -138,13 +158,11 @@ export default function Sidebar({
         ))}
       </div>
       <div className="sidebar__actions">
-        {tabs.length > 0 && (
-          <button className="sidebar__close-all" onClick={onCloseAll} title="Close all terminals">
-            Close All
-          </button>
-        )}
         <button className="sidebar__add" onClick={onNew} title="New terminal">
           + New Terminal
+        </button>
+        <button className="sidebar__close-all" onClick={onCloseAll} title="Close all terminals">
+          &#10005; Close All
         </button>
       </div>
     </div>

@@ -25,6 +25,7 @@ export default function App() {
   const [fontSize, setFontSize] = useState<number>(14);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -103,24 +104,30 @@ export default function App() {
   );
 
   const closeAllTerminals = useCallback(async () => {
-    const checks = await Promise.all(
-      tabs.map(async (tab) => ({
-        id: tab.id,
-        hasClaude: await window.terminal.checkClaude(tab.id),
-      }))
-    );
+    setClosing(true);
+    try {
+      // Check sequentially in batches of 4 to avoid freezing from too many wmic calls
+      let claudeCount = 0;
+      for (let i = 0; i < tabs.length; i += 4) {
+        const batch = tabs.slice(i, i + 4);
+        const results = await Promise.all(
+          batch.map((tab) => window.terminal.checkClaude(tab.id))
+        );
+        claudeCount += results.filter(Boolean).length;
+      }
 
-    const claudeCount = checks.filter((c) => c.hasClaude).length;
-
-    if (claudeCount > 0) {
-      const allIds = tabs.map((t) => t.id);
-      const msg =
-        claudeCount === 1
-          ? getRandomClaudeMessage()
-          : `${claudeCount} Claudes are working in these terminals. Terminate them all?`;
-      setPendingClose({ ids: allIds, message: msg });
-    } else {
-      doKill(tabs.map((t) => t.id));
+      if (claudeCount > 0) {
+        const allIds = tabs.map((t) => t.id);
+        const msg =
+          claudeCount === 1
+            ? getRandomClaudeMessage()
+            : `${claudeCount} Claudes are working in these terminals. Terminate them all?`;
+        setPendingClose({ ids: allIds, message: msg });
+      } else {
+        doKill(tabs.map((t) => t.id));
+      }
+    } finally {
+      setClosing(false);
     }
   }, [tabs, doKill]);
 
@@ -189,6 +196,12 @@ export default function App() {
         onFontSizeChange={handleFontSizeChange}
       />
       <div className="app__main">
+        {closing && (
+          <div className="app__loading-overlay">
+            <div className="app__spinner" />
+            <span>Closing terminals...</span>
+          </div>
+        )}
         {tabs.length === 0 ? (
           <div className="app__empty">
             <p>No terminals open</p>
