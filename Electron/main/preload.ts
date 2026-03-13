@@ -18,6 +18,11 @@ export interface TerminalAPI {
   removeAllListeners: () => void;
 }
 
+export interface SettingsAPI {
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number }>;
+  set: (key: string, value: unknown) => void;
+}
+
 const terminalAPI: TerminalAPI = {
   create: (opts) => ipcRenderer.invoke("terminal:create", opts),
   write: (id, data) => ipcRenderer.send("terminal:input", { id, data }),
@@ -37,4 +42,10 @@ const terminalAPI: TerminalAPI = {
   },
 };
 
+const settingsAPI: SettingsAPI = {
+  get: () => ipcRenderer.invoke("settings:get"),
+  set: (key, value) => ipcRenderer.send("settings:set", { key, value }),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
+contextBridge.exposeInMainWorld("settings", settingsAPI);

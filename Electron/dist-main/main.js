@@ -38,12 +38,27 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const pty = __importStar(require("node-pty"));
 const child_process_1 = require("child_process");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Store = require("electron-store").default;
 const isDev = !electron_1.app.isPackaged;
+const store = new Store({
+    defaults: {
+        layout: "auto",
+        defaultCwd: "",
+        windowBounds: null,
+        windowMaximized: true,
+        fontSize: 14,
+    },
+});
 const terminals = new Map();
 function createWindow() {
+    const bounds = store.get("windowBounds");
+    const maximized = store.get("windowMaximized");
     const win = new electron_1.BrowserWindow({
-        width: 1200,
-        height: 800,
+        width: bounds?.width || 1200,
+        height: bounds?.height || 800,
+        x: bounds?.x,
+        y: bounds?.y,
         minWidth: 600,
         minHeight: 400,
         title: "Hivemind",
@@ -56,8 +71,22 @@ function createWindow() {
         },
     });
     win.setMenuBarVisibility(false);
-    win.maximize();
+    if (maximized) {
+        win.maximize();
+    }
     win.show();
+    // Save window state on changes
+    const saveWindowState = () => {
+        if (win.isMaximized()) {
+            store.set("windowMaximized", true);
+        }
+        else {
+            store.set("windowMaximized", false);
+            store.set("windowBounds", win.getBounds());
+        }
+    };
+    win.on("resize", saveWindowState);
+    win.on("move", saveWindowState);
     if (isDev) {
         win.loadURL("http://localhost:5174");
     }
@@ -65,6 +94,17 @@ function createWindow() {
         win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
     }
 }
+// ── Settings IPC ──────────────────────────────────────────────
+electron_1.ipcMain.handle("settings:get", () => {
+    return {
+        layout: store.get("layout"),
+        defaultCwd: store.get("defaultCwd"),
+        fontSize: store.get("fontSize"),
+    };
+});
+electron_1.ipcMain.on("settings:set", (_event, { key, value }) => {
+    store.set(key, value);
+});
 // ── Terminal IPC ──────────────────────────────────────────────
 const defaultShell = os.platform() === "win32"
     ? "powershell.exe"
@@ -72,7 +112,8 @@ const defaultShell = os.platform() === "win32"
 electron_1.ipcMain.handle("terminal:create", (_event, opts = {}) => {
     const id = `term_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const shell = opts.shell || defaultShell;
-    const cwd = opts.cwd || os.homedir();
+    const savedCwd = store.get("defaultCwd");
+    const cwd = opts.cwd || (savedCwd ? savedCwd : os.homedir());
     const cols = opts.cols || 80;
     const rows = opts.rows || 24;
     const proc = pty.spawn(shell, [], {

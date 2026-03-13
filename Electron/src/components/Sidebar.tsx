@@ -9,11 +9,13 @@ interface SidebarProps {
   tabs: Tab[];
   activeTab: string;
   layout: LayoutMode;
+  collapsed: boolean;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onCloseAll: () => void;
   onNew: () => void;
   onLayoutChange: (layout: LayoutMode) => void;
+  onToggleCollapse: () => void;
 }
 
 const layoutOptions: { value: LayoutMode; label: string }[] = [
@@ -29,16 +31,31 @@ export default function Sidebar({
   tabs,
   activeTab,
   layout,
+  collapsed,
   onSelect,
   onClose,
   onCloseAll,
   onNew,
   onLayoutChange,
+  onToggleCollapse,
 }: SidebarProps) {
+  if (collapsed) {
+    return (
+      <div className="sidebar sidebar--collapsed">
+        <button className="sidebar__expand" onClick={onToggleCollapse} title="Expand sidebar">
+          &#9654;
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="sidebar">
       <div className="sidebar__header">
         <h1 className="sidebar__title">Hivemind</h1>
+        <button className="sidebar__collapse" onClick={onToggleCollapse} title="Collapse sidebar">
+          &#9664;
+        </button>
       </div>
       <div className="sidebar__layout">
         <label className="sidebar__layout-label">Layout</label>
@@ -60,6 +77,7 @@ export default function Sidebar({
             key={tab.id}
             className={`sidebar__item ${tab.id === activeTab ? "sidebar__item--active" : ""}`}
             onClick={() => onSelect(tab.id)}
+            title={tab.title}
           >
             <span className="sidebar__index">{index + 1}</span>
             <span className="sidebar__item-title">{tab.title}</span>

@@ -16,9 +16,15 @@ interface TerminalAPI {
   removeAllListeners: () => void;
 }
 
+interface SettingsAPI {
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number }>;
+  set: (key: string, value: unknown) => void;
+}
+
 declare global {
   interface Window {
     terminal: TerminalAPI;
+    settings: SettingsAPI;
   }
 }
 

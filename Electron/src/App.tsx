@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Terminal from "./components/Terminal";
 import Sidebar from "./components/Sidebar";
+import Settings from "./components/Settings";
 import ConfirmModal, { getRandomClaudeMessage } from "./components/ConfirmModal";
 import "./App.css";
 
@@ -21,9 +22,45 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>("");
   const [layout, setLayout] = useState<LayoutMode>("auto");
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
+  const [defaultCwd, setDefaultCwd] = useState<string>("");
+  const [fontSize, setFontSize] = useState<number>(14);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    window.settings.get().then((s) => {
+      setLayout(s.layout as LayoutMode);
+      setDefaultCwd(s.defaultCwd);
+      setFontSize(s.fontSize);
+      setSettingsLoaded(true);
+    });
+  }, []);
+
+  // Persist layout changes
+  const handleLayoutChange = useCallback((newLayout: LayoutMode) => {
+    setLayout(newLayout);
+    window.settings.set("layout", newLayout);
+  }, []);
+
+  // Persist default cwd changes
+  const handleDefaultCwdChange = useCallback((cwd: string) => {
+    setDefaultCwd(cwd);
+    window.settings.set("defaultCwd", cwd);
+  }, []);
+
+  // Persist font size changes
+  const handleFontSizeChange = useCallback((size: number) => {
+    setFontSize(size);
+    window.settings.set("fontSize", size);
+  }, []);
 
   const createTerminal = useCallback(async () => {
-    const result = await window.terminal.create({ cols: 80, rows: 24 });
+    const opts: { cols: number; rows: number; cwd?: string } = { cols: 80, rows: 24 };
+    if (defaultCwd) {
+      opts.cwd = defaultCwd;
+    }
+    const result = await window.terminal.create(opts);
 
     const newTab: TerminalTab = {
       id: result.id,
@@ -32,7 +69,7 @@ export default function App() {
 
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(result.id);
-  }, [tabs.length]);
+  }, [tabs.length, defaultCwd]);
 
   const doKill = useCallback(
     (ids: string[]) => {
@@ -99,9 +136,40 @@ export default function App() {
     setPendingClose(null);
   }, []);
 
+  const claudeNames = [
+    "ClaudeZilla",
+    "Sir Claude-a-Lot",
+    "The Claudenator",
+    "Claude Van Damme",
+    "MC Claude",
+    "Claude Atlas",
+    "Claude Nine",
+    "Cloudy McCloudeface",
+    "El Claude",
+    "Claude Almighty",
+    "The Oracle of Claude",
+    "Agent Claude",
+    "DJ Claude",
+    "Captain Claude",
+    "Claude Norris",
+  ];
+
+  const getClaudeName = () =>
+    claudeNames[Math.floor(Math.random() * claudeNames.length)];
+
+  const onClaudeDetected = useCallback((id: string, folder: string) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, title: `${getClaudeName()} - ${folder}` } : t
+      )
+    );
+  }, []);
+
   const visibleTabs = layout === "single"
     ? tabs.filter((t) => t.id === activeTab)
     : tabs;
+
+  if (!settingsLoaded) return null;
 
   return (
     <div className="app">
@@ -109,11 +177,13 @@ export default function App() {
         tabs={tabs}
         activeTab={activeTab}
         layout={layout}
+        collapsed={sidebarCollapsed}
         onSelect={setActiveTab}
         onClose={closeTerminal}
         onCloseAll={closeAllTerminals}
         onNew={createTerminal}
-        onLayoutChange={setLayout}
+        onLayoutChange={handleLayoutChange}
+        onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
       />
       <div className="app__main">
         {tabs.length === 0 ? (
@@ -122,6 +192,12 @@ export default function App() {
             <button className="app__empty-btn" onClick={createTerminal}>
               Open a Terminal
             </button>
+            <Settings
+              defaultCwd={defaultCwd}
+              fontSize={fontSize}
+              onDefaultCwdChange={handleDefaultCwdChange}
+              onFontSizeChange={handleFontSizeChange}
+            />
           </div>
         ) : (
           <div className={`app__grid app__grid--${layout}`}>
@@ -145,7 +221,7 @@ export default function App() {
                   </button>
                 </div>
                 <div className="app__grid-terminal">
-                  <Terminal id={tab.id} isActive={layout === "single" || true} />
+                  <Terminal id={tab.id} isActive={layout === "single" || true} fontSize={fontSize} onClaudeDetected={onClaudeDetected} />
                 </div>
               </div>
             ))}

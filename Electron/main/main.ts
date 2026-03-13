@@ -3,8 +3,32 @@ import * as path from "path";
 import * as os from "os";
 import * as pty from "node-pty";
 import { execSync } from "child_process";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Store = require("electron-store").default;
 
 const isDev = !app.isPackaged;
+
+// ── Persistent settings ───────────────────────────────────────
+
+interface AppSettings {
+  layout: string;
+  defaultCwd: string;
+  windowBounds: { x: number; y: number; width: number; height: number } | null;
+  windowMaximized: boolean;
+  fontSize: number;
+}
+
+const store = new Store({
+  defaults: {
+    layout: "auto",
+    defaultCwd: "",
+    windowBounds: null,
+    windowMaximized: true,
+    fontSize: 14,
+  },
+});
+
+// ── Terminal management ───────────────────────────────────────
 
 interface TerminalCreateOpts {
   shell?: string;
@@ -16,9 +40,14 @@ interface TerminalCreateOpts {
 const terminals = new Map<string, pty.IPty>();
 
 function createWindow(): void {
+  const bounds = store.get("windowBounds");
+  const maximized = store.get("windowMaximized");
+
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: bounds?.width || 1200,
+    height: bounds?.height || 800,
+    x: bounds?.x,
+    y: bounds?.y,
     minWidth: 600,
     minHeight: 400,
     title: "Hivemind",
@@ -32,8 +61,23 @@ function createWindow(): void {
   });
 
   win.setMenuBarVisibility(false);
-  win.maximize();
+
+  if (maximized) {
+    win.maximize();
+  }
   win.show();
+
+  // Save window state on changes
+  const saveWindowState = () => {
+    if (win.isMaximized()) {
+      store.set("windowMaximized", true);
+    } else {
+      store.set("windowMaximized", false);
+      store.set("windowBounds", win.getBounds());
+    }
+  };
+  win.on("resize", saveWindowState);
+  win.on("move", saveWindowState);
 
   if (isDev) {
     win.loadURL("http://localhost:5174");
@@ -41,6 +85,23 @@ function createWindow(): void {
     win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
   }
 }
+
+// ── Settings IPC ──────────────────────────────────────────────
+
+ipcMain.handle("settings:get", () => {
+  return {
+    layout: store.get("layout"),
+    defaultCwd: store.get("defaultCwd"),
+    fontSize: store.get("fontSize"),
+  };
+});
+
+ipcMain.on(
+  "settings:set",
+  (_event: IpcMainEvent, { key, value }: { key: string; value: unknown }) => {
+    store.set(key as keyof AppSettings, value);
+  }
+);
 
 // ── Terminal IPC ──────────────────────────────────────────────
 
@@ -54,7 +115,8 @@ ipcMain.handle(
   (_event: IpcMainInvokeEvent, opts: TerminalCreateOpts = {}) => {
     const id = `term_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const shell = opts.shell || defaultShell;
-    const cwd = opts.cwd || os.homedir();
+    const savedCwd = store.get("defaultCwd");
+    const cwd = opts.cwd || (savedCwd ? savedCwd : os.homedir());
     const cols = opts.cols || 80;
     const rows = opts.rows || 24;
 
