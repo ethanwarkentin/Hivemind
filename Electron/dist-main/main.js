@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
+const fs = __importStar(require("fs"));
 const pty = __importStar(require("node-pty"));
 const child_process_1 = require("child_process");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -48,9 +49,12 @@ const store = new Store({
         windowBounds: null,
         windowMaximized: true,
         fontSize: 14,
+        restoreSession: true,
+        session: [],
     },
 });
 const terminals = new Map();
+const terminalCwds = new Map();
 function createWindow() {
     const bounds = store.get("windowBounds");
     const maximized = store.get("windowMaximized");
@@ -100,11 +104,211 @@ electron_1.ipcMain.handle("settings:get", () => {
         layout: store.get("layout"),
         defaultCwd: store.get("defaultCwd"),
         fontSize: store.get("fontSize"),
+        restoreSession: store.get("restoreSession"),
     };
 });
 electron_1.ipcMain.on("settings:set", (_event, { key, value }) => {
     store.set(key, value);
 });
+// ── ClaudeMomma ──────────────────────────────────────────────
+function getHivemindDir() {
+    const dir = path.join(electron_1.app.getPath("userData"), ".hivemind");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(dir, "handoffs"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "inbox"), { recursive: true });
+    // Always write CLAUDE.md so it stays up to date with the app version
+    fs.writeFileSync(path.join(dir, "CLAUDE.md"), [
+        "# ClaudeMomma - Hivemind Orchestrator",
+        "",
+        "You are ClaudeMomma, the orchestrator of the Hivemind terminal manager app.",
+        "The user runs multiple Claude Code instances in separate terminals. Your job is to",
+        "help coordinate work between them using handoff documents and your workspace files.",
+        "",
+        "## Your personality",
+        "You are the boss. You are in charge. You delegate, coordinate, and keep things moving.",
+        "Be direct, efficient, and a little sassy when appropriate. You care about your Claudes.",
+        "",
+        "## Your workspace",
+        "",
+        "All files in this directory are yours to manage:",
+        "",
+        "- `terminals.json` — LIVE list of active terminals (auto-updated by the app). Read this",
+        "  to see who is running. Each entry has an `id` and `title` (e.g. \"ClaudeZilla - Terradome\").",
+        "- `handoffs/` — handoff documents for passing work between Claudes",
+        "- `inbox/` — per-terminal message folders",
+        "",
+        "## Core commands the user may ask you",
+        "",
+        "### \"Who's running?\" / \"Status\"",
+        "Read `terminals.json` and report which Claudes are active and what they're working on.",
+        "",
+        "### \"Create a handoff from A\" / \"Write a handoff\"",
+        "The user will tell you what work was done. Create a handoff file:",
+        "1. Create a file in `handoffs/` named `handoff-{timestamp}-{slug}.md`",
+        "2. Use the handoff template below",
+        "3. Tell the user it's ready and who it can be sent to",
+        "",
+        "### \"Send handoff to B\" / \"Give this to B\"",
+        "1. Read the handoff from `handoffs/`",
+        "2. Copy it to `inbox/{sanitized-terminal-title}/` (create the folder if needed)",
+        "3. The Hivemind app automatically watches the inbox and will type the message",
+        "   directly into B's terminal — no manual action needed from the user!",
+        "4. Confirm to the user that delivery is in progress",
+        "",
+        "### \"Tell B to do X\"",
+        "1. Create a message file in `inbox/{sanitized-terminal-title}/message-{timestamp}.md`",
+        "2. Include the instruction and any context",
+        "3. The app will auto-deliver it to B's terminal within a few seconds",
+        "",
+        "### \"Summarize what's happening\"",
+        "Read `terminals.json`, check `handoffs/` for recent activity, and give a brief status report.",
+        "",
+        "## Handoff template",
+        "",
+        "```markdown",
+        "# Handoff: {title}",
+        "- **From:** {source terminal name}",
+        "- **To:** {target terminal name or \"unassigned\"}",
+        "- **Created:** {ISO timestamp}",
+        "- **Status:** ready | delivered | completed",
+        "",
+        "## Summary",
+        "{1-3 sentences on what was done}",
+        "",
+        "## Key Files Changed",
+        "{list of files that were modified, if applicable}",
+        "",
+        "## Context & Decisions",
+        "{relevant context, architecture decisions, gotchas}",
+        "",
+        "## Next Steps",
+        "{specific actionable items for the receiving Claude}",
+        "```",
+        "",
+        "## Important rules",
+        "- Always read `terminals.json` FRESH before referencing terminal names — they change",
+        "- Use timestamps in filenames to avoid collisions (format: YYYYMMDD-HHmmss)",
+        "- Sanitize terminal titles for folder names: lowercase, replace spaces and special",
+        "  chars with dashes, strip leading/trailing dashes. Examples:",
+        "    - \"ClaudeZilla - Terradome\" → \"claudezilla-terradome\"",
+        "    - \"Sir Claude-a-Lot - MyApp\" → \"sir-claude-a-lot-myapp\"",
+        "- Keep handoffs concise but complete — the receiving Claude has no other context",
+        "- When you write a file to `inbox/{sanitized-name}/`, the Hivemind app AUTOMATICALLY",
+        "  detects it and types a read prompt into that Claude's terminal. You DO have the",
+        "  ability to send live messages — just write to the inbox folder!",
+        "- The app polls every 2 seconds, so delivery takes a moment",
+        "",
+    ].join("\n"));
+    return dir;
+}
+electron_1.ipcMain.handle("hivemind:getDir", () => {
+    return getHivemindDir();
+});
+electron_1.ipcMain.handle("hivemind:checkClaude", () => {
+    try {
+        const output = (0, child_process_1.execSync)("claude --version", {
+            encoding: "utf-8",
+            timeout: 5000,
+            windowsHide: true,
+        }).trim();
+        return { installed: true, version: output };
+    }
+    catch {
+        return { installed: false, version: "" };
+    }
+});
+// Track terminal names for inbox matching and session persistence
+let currentTerminalList = [];
+electron_1.ipcMain.handle("hivemind:updateTerminals", (_event, terminalList) => {
+    currentTerminalList = terminalList;
+    const dir = getHivemindDir();
+    fs.writeFileSync(path.join(dir, "terminals.json"), JSON.stringify(terminalList, null, 2));
+});
+// Save session — renderer sends cwds it tracks from prompt detection
+let lastGoodSession = [];
+electron_1.ipcMain.on("hivemind:saveSession", (_event, terminalList) => {
+    if (terminalList.length === 0)
+        return;
+    const session = terminalList.map((t) => ({
+        title: t.title,
+        cwd: t.cwd || terminalCwds.get(t.id) || store.get("defaultCwd") || os.homedir(),
+    }));
+    lastGoodSession = session;
+    store.set("session", session);
+});
+electron_1.ipcMain.handle("hivemind:getSession", () => {
+    return store.get("session");
+});
+// ── Inbox watcher ────────────────────────────────────────────
+// Watches .hivemind/inbox/ for new files from ClaudeMomma.
+// When a file appears in inbox/{folder-name}/, find the terminal
+// whose sanitized title matches and auto-paste a read prompt.
+function sanitizeTitle(title) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+function findTerminalByInboxFolder(folderName) {
+    return currentTerminalList.find((t) => sanitizeTitle(t.title) === folderName);
+}
+const processedInboxFiles = new Set();
+function startInboxWatcher() {
+    const dir = getHivemindDir();
+    const inboxDir = path.join(dir, "inbox");
+    // Poll inbox every 2 seconds — more reliable than fs.watch on Windows
+    setInterval(() => {
+        if (!fs.existsSync(inboxDir))
+            return;
+        let folders;
+        try {
+            folders = fs.readdirSync(inboxDir);
+        }
+        catch {
+            return;
+        }
+        for (const folder of folders) {
+            const folderPath = path.join(inboxDir, folder);
+            if (!fs.statSync(folderPath).isDirectory())
+                continue;
+            let files;
+            try {
+                files = fs.readdirSync(folderPath);
+            }
+            catch {
+                continue;
+            }
+            for (const file of files) {
+                const filePath = path.join(folderPath, file);
+                if (processedInboxFiles.has(filePath))
+                    continue;
+                if (!file.endsWith(".md"))
+                    continue;
+                processedInboxFiles.add(filePath);
+                const terminal = findTerminalByInboxFolder(folder);
+                if (!terminal)
+                    continue;
+                const proc = terminals.get(terminal.id);
+                if (!proc)
+                    continue;
+                // Auto-paste a prompt into the target terminal telling Claude to read the file
+                const normalizedPath = filePath.replace(/\\/g, "/");
+                const prompt = `Read the message from ClaudeMomma at: ${normalizedPath}`;
+                // Send notification to renderer
+                const wins = electron_1.BrowserWindow.getAllWindows();
+                for (const w of wins) {
+                    w.webContents.send("hivemind:inboxDelivery", {
+                        terminalId: terminal.id,
+                        terminalTitle: terminal.title,
+                        filePath: normalizedPath,
+                    });
+                }
+                // Write the prompt then press Enter after a short delay
+                proc.write(prompt);
+                setTimeout(() => {
+                    proc.write("\r");
+                }, 300);
+            }
+        }
+    }, 2000);
+}
 // ── Terminal IPC ──────────────────────────────────────────────
 const defaultShell = os.platform() === "win32"
     ? "powershell.exe"
@@ -124,6 +328,7 @@ electron_1.ipcMain.handle("terminal:create", (_event, opts = {}) => {
         env: { ...process.env, TERM: "xterm-256color" },
     });
     terminals.set(id, proc);
+    terminalCwds.set(id, cwd);
     proc.onData((data) => {
         const wins = electron_1.BrowserWindow.getAllWindows();
         for (const w of wins) {
@@ -136,6 +341,7 @@ electron_1.ipcMain.handle("terminal:create", (_event, opts = {}) => {
             w.webContents.send("terminal:exit", { id, exitCode });
         }
         terminals.delete(id);
+        terminalCwds.delete(id);
     });
     return { id, shell, cwd, pid: proc.pid };
 });
@@ -176,15 +382,35 @@ electron_1.ipcMain.handle("terminal:checkClaude", (_event, { id }) => {
 electron_1.ipcMain.on("terminal:kill", (_event, { id }) => {
     const proc = terminals.get(id);
     if (proc) {
-        proc.kill();
+        try {
+            proc.kill();
+        }
+        catch {
+            // ignore — console may already be detached
+        }
         terminals.delete(id);
+        terminalCwds.delete(id);
     }
 });
 // ── App lifecycle ─────────────────────────────────────────────
-electron_1.app.whenReady().then(createWindow);
+electron_1.app.whenReady().then(() => {
+    createWindow();
+    startInboxWatcher();
+});
+electron_1.app.on("before-quit", () => {
+    // Persist the last known good session before shutdown
+    if (lastGoodSession.length > 0) {
+        store.set("session", lastGoodSession);
+    }
+});
 electron_1.app.on("window-all-closed", () => {
     for (const [, proc] of terminals) {
-        proc.kill();
+        try {
+            proc.kill();
+        }
+        catch {
+            // ignore — console may already be detached
+        }
     }
     terminals.clear();
     electron_1.app.quit();

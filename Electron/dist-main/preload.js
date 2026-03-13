@@ -22,5 +22,13 @@ const settingsAPI = {
     get: () => electron_1.ipcRenderer.invoke("settings:get"),
     set: (key, value) => electron_1.ipcRenderer.send("settings:set", { key, value }),
 };
+const hivemindAPI = {
+    getDir: () => electron_1.ipcRenderer.invoke("hivemind:getDir"),
+    checkClaude: () => electron_1.ipcRenderer.invoke("hivemind:checkClaude"),
+    updateTerminals: (terminals) => electron_1.ipcRenderer.invoke("hivemind:updateTerminals", terminals),
+    saveSession: (terminals) => electron_1.ipcRenderer.send("hivemind:saveSession", terminals),
+    getSession: () => electron_1.ipcRenderer.invoke("hivemind:getSession"),
+};
 electron_1.contextBridge.exposeInMainWorld("terminal", terminalAPI);
 electron_1.contextBridge.exposeInMainWorld("settings", settingsAPI);
+electron_1.contextBridge.exposeInMainWorld("hivemind", hivemindAPI);

@@ -47,5 +47,22 @@ const settingsAPI: SettingsAPI = {
   set: (key, value) => ipcRenderer.send("settings:set", { key, value }),
 };
 
+export interface HivemindAPI {
+  getDir: () => Promise<string>;
+  checkClaude: () => Promise<{ installed: boolean; version: string }>;
+  updateTerminals: (terminals: Array<{ id: string; title: string }>) => Promise<void>;
+  saveSession: (terminals: Array<{ id: string; title: string }>) => void;
+  getSession: () => Promise<Array<{ title: string; cwd: string }>>;
+}
+
+const hivemindAPI: HivemindAPI = {
+  getDir: () => ipcRenderer.invoke("hivemind:getDir"),
+  checkClaude: () => ipcRenderer.invoke("hivemind:checkClaude"),
+  updateTerminals: (terminals) => ipcRenderer.invoke("hivemind:updateTerminals", terminals),
+  saveSession: (terminals) => ipcRenderer.send("hivemind:saveSession", terminals),
+  getSession: () => ipcRenderer.invoke("hivemind:getSession"),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
 contextBridge.exposeInMainWorld("settings", settingsAPI);
+contextBridge.exposeInMainWorld("hivemind", hivemindAPI);

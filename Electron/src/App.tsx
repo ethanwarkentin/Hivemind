@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import Terminal from "./components/Terminal";
 import Sidebar from "./components/Sidebar";
+import ClaudeMomma from "./components/ClaudeMomma";
 import ConfirmModal, { getRandomClaudeMessage } from "./components/ConfirmModal";
 import "./App.css";
 
@@ -9,6 +10,7 @@ export type LayoutMode = "auto" | "single" | "columns" | "rows" | "grid-2x2" | "
 interface TerminalTab {
   id: string;
   title: string;
+  cwd?: string;
 }
 
 interface PendingClose {
@@ -26,6 +28,8 @@ export default function App() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [mommaCollapsed, setMommaCollapsed] = useState(false);
+  const [restoreSession, setRestoreSession] = useState(true);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -33,9 +37,27 @@ export default function App() {
       setLayout(s.layout as LayoutMode);
       setDefaultCwd(s.defaultCwd);
       setFontSize(s.fontSize);
+      setRestoreSession(s.restoreSession);
       setSettingsLoaded(true);
     });
   }, []);
+
+  // Restore previous session
+  useEffect(() => {
+    if (!settingsLoaded || !restoreSession) return;
+    window.hivemind.getSession().then(async (session) => {
+      if (!session || session.length === 0) return;
+      const newTabs: TerminalTab[] = [];
+      for (const s of session) {
+        const result = await window.terminal.create({ cols: 80, rows: 24, cwd: s.cwd });
+        newTabs.push({ id: result.id, title: s.title });
+      }
+      if (newTabs.length > 0) {
+        setTabs(newTabs);
+        setActiveTab(newTabs[newTabs.length - 1].id);
+      }
+    });
+  }, [settingsLoaded]);
 
   // Persist layout changes
   const handleLayoutChange = useCallback((newLayout: LayoutMode) => {
@@ -53,6 +75,12 @@ export default function App() {
   const handleFontSizeChange = useCallback((size: number) => {
     setFontSize(size);
     window.settings.set("fontSize", size);
+  }, []);
+
+  // Persist restore session toggle
+  const handleRestoreSessionChange = useCallback((enabled: boolean) => {
+    setRestoreSession(enabled);
+    window.settings.set("restoreSession", enabled);
   }, []);
 
   const createTerminal = useCallback(async () => {
@@ -171,6 +199,23 @@ export default function App() {
     );
   }, []);
 
+  const onCwdChange = useCallback((id: string, cwd: string) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, cwd } : t))
+    );
+  }, []);
+
+  // Keep terminals.json in sync for ClaudeMomma + save session
+  useEffect(() => {
+    const list = tabs.map((t) => ({ id: t.id, title: t.title }));
+    window.hivemind.updateTerminals(list);
+    // Only save non-empty sessions (empty = app closing, don't overwrite)
+    if (list.length > 0) {
+      const sessionList = tabs.map((t) => ({ id: t.id, title: t.title, cwd: t.cwd || "" }));
+      window.hivemind.saveSession(sessionList);
+    }
+  }, [tabs]);
+
   const visibleTabs = layout === "single"
     ? tabs.filter((t) => t.id === activeTab)
     : tabs;
@@ -194,49 +239,58 @@ export default function App() {
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         onDefaultCwdChange={handleDefaultCwdChange}
         onFontSizeChange={handleFontSizeChange}
+        restoreSession={restoreSession}
+        onRestoreSessionChange={handleRestoreSessionChange}
       />
       <div className="app__main">
-        {closing && (
-          <div className="app__loading-overlay">
-            <div className="app__spinner" />
-            <span>Closing terminals...</span>
-          </div>
-        )}
-        {tabs.length === 0 ? (
-          <div className="app__empty">
-            <p>No terminals open</p>
-            <button className="app__empty-btn" onClick={createTerminal}>
-              Open a Terminal
-            </button>
-          </div>
-        ) : (
-          <div className={`app__grid app__grid--${layout}`}>
-            {visibleTabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={`app__grid-cell ${tab.id === activeTab ? "app__grid-cell--active" : ""}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <div className="app__grid-header">
-                  <span className="app__grid-title">{tab.title}</span>
-                  <button
-                    className="app__grid-close"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeTerminal(tab.id);
-                    }}
-                    title="Close terminal"
-                  >
-                    ×
-                  </button>
+        <ClaudeMomma
+          fontSize={fontSize}
+          collapsed={mommaCollapsed}
+          onToggleCollapse={() => setMommaCollapsed((prev) => !prev)}
+        />
+        <div className="app__content">
+          {closing && (
+            <div className="app__loading-overlay">
+              <div className="app__spinner" />
+              <span>Closing terminals...</span>
+            </div>
+          )}
+          {tabs.length === 0 ? (
+            <div className="app__empty">
+              <p>No terminals open</p>
+              <button className="app__empty-btn" onClick={createTerminal}>
+                Open a Terminal
+              </button>
+            </div>
+          ) : (
+            <div className={`app__grid app__grid--${layout}`}>
+              {visibleTabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={`app__grid-cell ${tab.id === activeTab ? "app__grid-cell--active" : ""}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <div className="app__grid-header">
+                    <span className="app__grid-title">{tab.title}</span>
+                    <button
+                      className="app__grid-close"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTerminal(tab.id);
+                      }}
+                      title="Close terminal"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="app__grid-terminal">
+                    <Terminal id={tab.id} isActive={layout === "single" || true} fontSize={fontSize} onClaudeDetected={onClaudeDetected} onCwdChange={onCwdChange} />
+                  </div>
                 </div>
-                <div className="app__grid-terminal">
-                  <Terminal id={tab.id} isActive={layout === "single" || true} fontSize={fontSize} onClaudeDetected={onClaudeDetected} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       {pendingClose && (
         <ConfirmModal
