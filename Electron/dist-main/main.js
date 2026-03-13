@@ -37,6 +37,7 @@ const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const pty = __importStar(require("node-pty"));
+const child_process_1 = require("child_process");
 const isDev = !electron_1.app.isPackaged;
 const terminals = new Map();
 function createWindow() {
@@ -111,6 +112,24 @@ electron_1.ipcMain.on("terminal:resize", (_event, { id, cols, rows }) => {
         catch {
             // ignore resize on dead terminal
         }
+    }
+});
+electron_1.ipcMain.handle("terminal:checkClaude", (_event, { id }) => {
+    const proc = terminals.get(id);
+    if (!proc)
+        return false;
+    try {
+        if (os.platform() === "win32") {
+            const output = (0, child_process_1.execSync)(`wmic process where "ParentProcessId=${proc.pid}" get Name /format:csv`, { encoding: "utf-8", timeout: 3000 });
+            return /claude/i.test(output);
+        }
+        else {
+            const output = (0, child_process_1.execSync)(`ps --ppid ${proc.pid} -o comm= 2>/dev/null || pgrep -P ${proc.pid} -l`, { encoding: "utf-8", timeout: 3000 });
+            return /claude/i.test(output);
+        }
+    }
+    catch {
+        return false;
     }
 });
 electron_1.ipcMain.on("terminal:kill", (_event, { id }) => {

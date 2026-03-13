@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import Terminal from "./components/Terminal";
 import Sidebar from "./components/Sidebar";
+import ConfirmModal, { getRandomClaudeMessage } from "./components/ConfirmModal";
 import "./App.css";
 
 export type LayoutMode = "auto" | "single" | "columns" | "rows" | "grid-2x2" | "grid-3x3";
@@ -10,10 +11,16 @@ interface TerminalTab {
   title: string;
 }
 
+interface PendingClose {
+  ids: string[];
+  message: string;
+}
+
 export default function App() {
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState<string>("");
   const [layout, setLayout] = useState<LayoutMode>("auto");
+  const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
 
   const createTerminal = useCallback(async () => {
     const result = await window.terminal.create({ cols: 80, rows: 24 });
@@ -27,15 +34,19 @@ export default function App() {
     setActiveTab(result.id);
   }, [tabs.length]);
 
-  const closeTerminal = useCallback(
-    (id: string) => {
-      window.terminal.kill(id);
+  const doKill = useCallback(
+    (ids: string[]) => {
+      for (const id of ids) {
+        window.terminal.kill(id);
+      }
       setTabs((prev) => {
-        const filtered = prev.filter((t) => t.id !== id);
-        if (activeTab === id && filtered.length > 0) {
-          setActiveTab(filtered[filtered.length - 1].id);
-        } else if (filtered.length === 0) {
-          setActiveTab("");
+        const filtered = prev.filter((t) => !ids.includes(t.id));
+        if (ids.includes(activeTab)) {
+          if (filtered.length > 0) {
+            setActiveTab(filtered[filtered.length - 1].id);
+          } else {
+            setActiveTab("");
+          }
         }
         return filtered;
       });
@@ -43,13 +54,50 @@ export default function App() {
     [activeTab]
   );
 
-  const closeAllTerminals = useCallback(() => {
-    for (const tab of tabs) {
-      window.terminal.kill(tab.id);
+  const closeTerminal = useCallback(
+    async (id: string) => {
+      const hasClaude = await window.terminal.checkClaude(id);
+      if (hasClaude) {
+        setPendingClose({ ids: [id], message: getRandomClaudeMessage() });
+      } else {
+        doKill([id]);
+      }
+    },
+    [doKill]
+  );
+
+  const closeAllTerminals = useCallback(async () => {
+    const checks = await Promise.all(
+      tabs.map(async (tab) => ({
+        id: tab.id,
+        hasClaude: await window.terminal.checkClaude(tab.id),
+      }))
+    );
+
+    const claudeCount = checks.filter((c) => c.hasClaude).length;
+
+    if (claudeCount > 0) {
+      const allIds = tabs.map((t) => t.id);
+      const msg =
+        claudeCount === 1
+          ? getRandomClaudeMessage()
+          : `${claudeCount} Claudes are working in these terminals. Terminate them all?`;
+      setPendingClose({ ids: allIds, message: msg });
+    } else {
+      doKill(tabs.map((t) => t.id));
     }
-    setTabs([]);
-    setActiveTab("");
-  }, [tabs]);
+  }, [tabs, doKill]);
+
+  const confirmClose = useCallback(() => {
+    if (pendingClose) {
+      doKill(pendingClose.ids);
+      setPendingClose(null);
+    }
+  }, [pendingClose, doKill]);
+
+  const cancelClose = useCallback(() => {
+    setPendingClose(null);
+  }, []);
 
   const visibleTabs = layout === "single"
     ? tabs.filter((t) => t.id === activeTab)
@@ -104,6 +152,13 @@ export default function App() {
           </div>
         )}
       </div>
+      {pendingClose && (
+        <ConfirmModal
+          message={pendingClose.message}
+          onConfirm={confirmClose}
+          onCancel={cancelClose}
+        />
+      )}
     </div>
   );
 }

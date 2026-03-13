@@ -6,6 +6,7 @@ const terminalAPI = {
     write: (id, data) => electron_1.ipcRenderer.send("terminal:input", { id, data }),
     resize: (id, cols, rows) => electron_1.ipcRenderer.send("terminal:resize", { id, cols, rows }),
     kill: (id) => electron_1.ipcRenderer.send("terminal:kill", { id }),
+    checkClaude: (id) => electron_1.ipcRenderer.invoke("terminal:checkClaude", { id }),
     onData: (callback) => {
         electron_1.ipcRenderer.on("terminal:data", (_event, payload) => callback(payload));
     },

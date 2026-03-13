@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, IpcMainEvent } from "e
 import * as path from "path";
 import * as os from "os";
 import * as pty from "node-pty";
+import { execSync } from "child_process";
 
 const isDev = !app.isPackaged;
 
@@ -107,6 +108,32 @@ ipcMain.on(
       } catch {
         // ignore resize on dead terminal
       }
+    }
+  }
+);
+
+ipcMain.handle(
+  "terminal:checkClaude",
+  (_event: IpcMainInvokeEvent, { id }: { id: string }): boolean => {
+    const proc = terminals.get(id);
+    if (!proc) return false;
+
+    try {
+      if (os.platform() === "win32") {
+        const output = execSync(
+          `wmic process where "ParentProcessId=${proc.pid}" get Name /format:csv`,
+          { encoding: "utf-8", timeout: 3000 }
+        );
+        return /claude/i.test(output);
+      } else {
+        const output = execSync(
+          `ps --ppid ${proc.pid} -o comm= 2>/dev/null || pgrep -P ${proc.pid} -l`,
+          { encoding: "utf-8", timeout: 3000 }
+        );
+        return /claude/i.test(output);
+      }
+    } catch {
+      return false;
     }
   }
 );
