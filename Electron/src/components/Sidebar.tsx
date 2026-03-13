@@ -212,6 +212,8 @@ export default function Sidebar({
                 />
                 <span>Paulino Mode</span>
               </label>
+              <hr className="settings__divider" />
+              <div className="settings__version">v{__APP_VERSION__}</div>
             </div>
           </div>
         </div>
