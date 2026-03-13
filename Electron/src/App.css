@@ -218,6 +218,18 @@
   justify-content: space-between;
 }
 
+.sidebar__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
 .sidebar__title {
   font-size: 16px;
   font-weight: 600;
