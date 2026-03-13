@@ -124,7 +124,7 @@ export default function Sidebar({
       </div>
       <div className="sidebar__actions">
         <button className="sidebar__settings-toggle" onClick={() => setSettingsOpen(true)}>
-          Settings
+          &#9881; Settings
         </button>
         <button className="sidebar__add" onClick={onNew} title="New terminal">
           + New Terminal
