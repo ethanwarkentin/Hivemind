@@ -1,0 +1,154 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1a1b26;
+  color: #a9b1d6;
+}
+
+.app__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #13141c;
+  border-bottom: 1px solid #292e42;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.app__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #7aa2f7;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  letter-spacing: 1px;
+}
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  background: #16171e;
+  border-bottom: 1px solid #292e42;
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-right: 1px solid #292e42;
+  font-size: 13px;
+  color: #565f89;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: #1e1f2b;
+  color: #a9b1d6;
+}
+
+.tab--active {
+  background: #1a1b26;
+  color: #c0caf5;
+  border-bottom: 2px solid #7aa2f7;
+}
+
+.tab__index {
+  font-size: 11px;
+  background: #292e42;
+  color: #565f89;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-weight: 600;
+}
+
+.tab--active .tab__index {
+  background: #3d59a1;
+  color: #c0caf5;
+}
+
+.tab__title {
+  flex: 1;
+}
+
+.tab__close {
+  background: none;
+  border: none;
+  color: #565f89;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.tab__close:hover {
+  background: #f7768e;
+  color: #1a1b26;
+}
+
+.tab-bar__add {
+  background: none;
+  border: none;
+  color: #565f89;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 6px 14px;
+  transition: color 0.15s;
+}
+
+.tab-bar__add:hover {
+  color: #9ece6a;
+}
+
+/* Terminal area */
+.app__terminals {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.app__terminal-pane {
+  position: absolute;
+  inset: 0;
+  padding: 4px;
+}
+
+.app__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: #565f89;
+}
+
+.app__empty p {
+  font-size: 18px;
+}
+
+.app__empty-btn {
+  background: #3d59a1;
+  color: #c0caf5;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.app__empty-btn:hover {
+  background: #7aa2f7;
+  color: #1a1b26;
+}
