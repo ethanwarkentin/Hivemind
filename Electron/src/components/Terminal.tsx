@@ -46,6 +46,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
   const claudeDetectedRef = useRef(false);
   const outputBufferRef = useRef("");
   const cwdBufferRef = useRef("");
+  const lastSelectionRef = useRef("");
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -72,6 +73,14 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
+
+    // Track selection changes so we have it available on right-click
+    xterm.onSelectionChange(() => {
+      const sel = xterm.getSelection();
+      if (sel) {
+        lastSelectionRef.current = sel;
+      }
+    });
 
     // Send user keystrokes to the PTY
     xterm.onData((data: string) => {
@@ -178,16 +187,24 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
     });
     resizeObserver.observe(containerRef.current);
 
-    // Right-click to paste
+    // Right-click: selection = copy, no selection = paste (CMD-style)
+    // We use the tracked selection since xterm may clear it before contextmenu fires
     const handleContextMenu = async (e: MouseEvent) => {
       e.preventDefault();
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          window.terminal.write(id, text);
+      const selection = xterm.getSelection() || lastSelectionRef.current;
+      if (selection) {
+        await navigator.clipboard.writeText(selection);
+        xterm.clearSelection();
+        lastSelectionRef.current = "";
+      } else {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) {
+            window.terminal.write(id, text);
+          }
+        } catch {
+          // Clipboard access denied or empty
         }
-      } catch {
-        // Clipboard access denied or empty
       }
     };
     containerRef.current.addEventListener("contextmenu", handleContextMenu);
