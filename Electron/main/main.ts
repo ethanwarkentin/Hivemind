@@ -68,7 +68,9 @@ function createWindow(): void {
     minWidth: 600,
     minHeight: 400,
     title: "Hivemind",
-    icon: path.join(__dirname, "..", "public", "icon.png"),
+    icon: isDev
+      ? path.join(__dirname, "..", "public", "icon.png")
+      : path.join(process.resourcesPath, "icon.png"),
     backgroundColor: "#0d0e14",
     show: false,
     webPreferences: {
