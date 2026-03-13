@@ -38,6 +38,86 @@
   color: #7aa2f7;
 }
 
+/* Collapsed sidebar items */
+.sidebar__list--collapsed {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  gap: 2px;
+}
+
+.sidebar__icon-item {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  background: #292e42;
+  color: #565f89;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar__icon-item:hover {
+  background: #1e1f2b;
+  color: #a9b1d6;
+}
+
+.sidebar__icon-item--active {
+  background: #3d59a1;
+  color: #c0caf5;
+}
+
+.sidebar__actions--collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid #292e42;
+}
+
+.sidebar__icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar__icon-btn--close {
+  background: none;
+  color: #f7768e;
+}
+
+.sidebar__icon-btn--close:hover {
+  background: #f7768e;
+  color: #1a1b26;
+}
+
+.sidebar__icon-btn--new {
+  background: none;
+  color: #9ece6a;
+}
+
+.sidebar__icon-btn--new:hover {
+  background: #9ece6a;
+  color: #1a1b26;
+}
+
 .sidebar__header {
   padding: 14px 16px;
   border-bottom: 1px solid #292e42;
@@ -72,13 +152,32 @@
   color: #7aa2f7;
 }
 
-/* Layout dropdown */
-.sidebar__layout {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* Settings toggle + panel */
+.sidebar__settings-toggle {
+  background: none;
+  border: none;
+  border-bottom: 1px solid #292e42;
+  color: #565f89;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 8px 16px;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+}
+
+.sidebar__settings-toggle:hover {
+  color: #a9b1d6;
+  background: #1e1f2b;
+}
+
+.sidebar__settings {
   padding: 10px 12px;
   border-bottom: 1px solid #292e42;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .sidebar__layout-label {
@@ -205,7 +304,7 @@
   background: #1e1f2b;
 }
 
-.sidebar__close-all {
+.sidebar__add {
   border-bottom: 1px solid #292e42;
 }
 
@@ -221,17 +320,22 @@
   position: relative;
 }
 
-/* Grid layout */
+/* Grid layout - favors 2 columns, but full width for single terminal */
 .app__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(700px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   grid-auto-rows: 1fr;
   gap: 2px;
   height: 100%;
   background: #292e42;
 }
 
+.app__grid--single-item {
+  grid-template-columns: 1fr;
+}
+
 .app__grid-cell {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -351,6 +455,66 @@
 .app__empty-btn:hover {
   background: #7aa2f7;
   color: #1a1b26;
+}
+
+/* Loading overlay */
+.app__loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 500;
+  color: #565f89;
+  font-size: 14px;
+}
+
+.app__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #292e42;
+  border-top-color: #7aa2f7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Terminal loading overlay (for Claude startup) */
+.app__terminal-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.app__terminal-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #292e42;
+  border-top-color: #7aa2f7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.app__terminal-loading-message {
+  color: #a9b1d6;
+  font-size: 14px;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  text-align: center;
+  padding: 0 20px;
+  max-width: 280px;
 }
 
 /* Confirm modal */
@@ -479,4 +643,88 @@
 
 .settings__input--small {
   width: 80px;
+}
+
+.settings__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #a9b1d6;
+  cursor: pointer;
+}
+
+.settings__checkbox input[type="checkbox"] {
+  accent-color: #7aa2f7;
+  cursor: pointer;
+}
+
+/* Focus mode */
+.app__focus-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  z-index: 901;
+  background: #16171e;
+  border-bottom: 2px solid #7aa2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.app__focus-header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app__focus-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7aa2f7;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+.app__focus-hints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app__focus-hint {
+  font-size: 11px;
+  color: #565f89;
+}
+
+.app__focus-exit {
+  background: #292e42;
+  color: #a9b1d6;
+  border: none;
+  padding: 4px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app__focus-exit:hover {
+  background: #7aa2f7;
+  color: #1a1b26;
+}
+
+.app__grid-cell--focused {
+  position: fixed !important;
+  inset: 0;
+  top: 36px;
+  z-index: 900;
+  border: none !important;
+}
+
+.app__grid-cell--focused .app__grid-header {
+  display: none;
 }

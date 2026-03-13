@@ -19,8 +19,13 @@ export interface TerminalAPI {
 }
 
 export interface SettingsAPI {
-  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number }>;
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean }>;
   set: (key: string, value: unknown) => void;
+}
+
+export interface HivemindAPI {
+  saveSession: (terminals: Array<{ id: string; title: string; cwd?: string; hadClaude?: boolean }>) => void;
+  getSession: () => Promise<Array<{ title: string; cwd: string; hadClaude: boolean }>>;
 }
 
 const terminalAPI: TerminalAPI = {
@@ -47,5 +52,11 @@ const settingsAPI: SettingsAPI = {
   set: (key, value) => ipcRenderer.send("settings:set", { key, value }),
 };
 
+const hivemindAPI: HivemindAPI = {
+  saveSession: (terminals) => ipcRenderer.send("hivemind:saveSession", terminals),
+  getSession: () => ipcRenderer.invoke("hivemind:getSession"),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
 contextBridge.exposeInMainWorld("settings", settingsAPI);
+contextBridge.exposeInMainWorld("hivemind", hivemindAPI);

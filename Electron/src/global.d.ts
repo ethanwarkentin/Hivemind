@@ -17,14 +17,20 @@ interface TerminalAPI {
 }
 
 interface SettingsAPI {
-  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number }>;
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean }>;
   set: (key: string, value: unknown) => void;
+}
+
+interface HivemindAPI {
+  saveSession: (terminals: Array<{ id: string; title: string; cwd?: string; hadClaude?: boolean }>) => void;
+  getSession: () => Promise<Array<{ title: string; cwd: string; hadClaude: boolean }>>;
 }
 
 declare global {
   interface Window {
     terminal: TerminalAPI;
     settings: SettingsAPI;
+    hivemind: HivemindAPI;
   }
 }
 
