@@ -19,6 +19,7 @@ interface TerminalAPI {
 interface SettingsAPI {
   get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean }>;
   set: (key: string, value: unknown) => void;
+  browseFolder: () => Promise<string | null>;
 }
 
 interface HivemindAPI {

@@ -73,6 +73,9 @@ export default function Sidebar({
           ))}
         </div>
         <div className="sidebar__actions sidebar__actions--collapsed">
+          <button className="sidebar__icon-btn sidebar__icon-btn--settings" onClick={() => setSettingsOpen(true)} title="Settings">
+            &#9881;
+          </button>
           <button className="sidebar__icon-btn sidebar__icon-btn--new" onClick={onNew} title="New terminal">
             &#43;
           </button>
@@ -92,60 +95,6 @@ export default function Sidebar({
           &#9664;
         </button>
       </div>
-      <button
-        className="sidebar__settings-toggle"
-        onClick={() => setSettingsOpen(!settingsOpen)}
-      >
-        {settingsOpen ? "Hide Settings" : "Settings"}
-      </button>
-      {settingsOpen && (
-        <div className="sidebar__settings">
-          <div className="settings__field">
-            <label className="settings__label">Layout</label>
-            <select
-              className="sidebar__layout-select"
-              value={layout}
-              onChange={(e) => onLayoutChange(e.target.value as LayoutMode)}
-            >
-              {layoutOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="settings__field">
-            <label className="settings__label">Default Directory</label>
-            <input
-              className="settings__input"
-              type="text"
-              value={defaultCwd}
-              onChange={(e) => onDefaultCwdChange(e.target.value)}
-              placeholder="e.g. C:\Projects"
-              spellCheck={false}
-            />
-          </div>
-          <div className="settings__field">
-            <label className="settings__label">Font Size</label>
-            <input
-              className="settings__input settings__input--small"
-              type="number"
-              min={8}
-              max={24}
-              value={fontSize}
-              onChange={(e) => onFontSizeChange(Number(e.target.value))}
-            />
-          </div>
-          <label className="settings__checkbox">
-            <input
-              type="checkbox"
-              checked={restoreSession}
-              onChange={(e) => onRestoreSessionChange(e.target.checked)}
-            />
-            <span>Restore previous session on startup</span>
-          </label>
-        </div>
-      )}
       <div className="sidebar__list">
         {tabs.map((tab, index) => (
           <div
@@ -170,6 +119,9 @@ export default function Sidebar({
         ))}
       </div>
       <div className="sidebar__actions">
+        <button className="sidebar__settings-toggle" onClick={() => setSettingsOpen(true)}>
+          Settings
+        </button>
         <button className="sidebar__add" onClick={onNew} title="New terminal">
           + New Terminal
         </button>
@@ -177,6 +129,76 @@ export default function Sidebar({
           &#10005; Close All
         </button>
       </div>
+      {settingsOpen && (
+        <div className="modal-overlay" onClick={() => setSettingsOpen(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-modal__header">
+              <h2 className="settings-modal__title">Settings</h2>
+              <button className="settings-modal__close" onClick={() => setSettingsOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div className="settings-modal__body">
+              <div className="settings__field">
+                <label className="settings__label">Layout</label>
+                <select
+                  className="sidebar__layout-select"
+                  value={layout}
+                  onChange={(e) => onLayoutChange(e.target.value as LayoutMode)}
+                >
+                  {layoutOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="settings__field">
+                <label className="settings__label">Default Directory</label>
+                <div className="settings__browse-row">
+                  <input
+                    className="settings__input settings__input--browse"
+                    type="text"
+                    value={defaultCwd}
+                    onChange={(e) => onDefaultCwdChange(e.target.value)}
+                    placeholder="e.g. C:\Projects"
+                    spellCheck={false}
+                    title={defaultCwd}
+                  />
+                  <button
+                    className="settings__browse-btn"
+                    onClick={async () => {
+                      const folder = await window.settings.browseFolder();
+                      if (folder) onDefaultCwdChange(folder);
+                    }}
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
+              <div className="settings__field">
+                <label className="settings__label">Font Size</label>
+                <input
+                  className="settings__input settings__input--small"
+                  type="number"
+                  min={8}
+                  max={24}
+                  value={fontSize}
+                  onChange={(e) => onFontSizeChange(Number(e.target.value))}
+                />
+              </div>
+              <label className="settings__checkbox">
+                <input
+                  type="checkbox"
+                  checked={restoreSession}
+                  onChange={(e) => onRestoreSessionChange(e.target.checked)}
+                />
+                <span>Restore previous session on startup</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -728,3 +728,93 @@
 .app__grid-cell--focused .app__grid-header {
   display: none;
 }
+
+/* Settings modal */
+.settings-modal {
+  background: #1e1f2b;
+  border: 1px solid #292e42;
+  border-radius: 10px;
+  padding: 0;
+  max-width: 460px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.settings-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #292e42;
+}
+
+.settings-modal__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #7aa2f7;
+  margin: 0;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+.settings-modal__close {
+  background: none;
+  border: none;
+  color: #565f89;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.settings-modal__close:hover {
+  color: #f7768e;
+  background: #292e42;
+}
+
+.settings-modal__body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings__browse-row {
+  display: flex;
+  gap: 6px;
+}
+
+.settings__input--browse {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings__browse-btn {
+  background: #292e42;
+  color: #a9b1d6;
+  border: 1px solid #292e42;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings__browse-btn:hover {
+  background: #7aa2f7;
+  color: #1a1b26;
+}
+
+.sidebar__icon-btn--settings {
+  background: none;
+  color: #565f89;
+}
+
+.sidebar__icon-btn--settings:hover {
+  background: #7aa2f7;
+  color: #1a1b26;
+}

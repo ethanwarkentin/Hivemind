@@ -257,15 +257,16 @@ export default function App() {
     "Claude Norris",
   ];
 
-  const getClaudeName = () =>
-    claudeNames[Math.floor(Math.random() * claudeNames.length)];
-
   const onClaudeDetected = useCallback((id: string, folder: string) => {
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, title: `${getClaudeName()} - ${folder}`, hadClaude: true } : t
-      )
-    );
+    setTabs((prev) => {
+      const usedNames = new Set(prev.map((t) => t.title.split(" - ")[0]));
+      const available = claudeNames.filter((n) => !usedNames.has(n));
+      const pool = available.length > 0 ? available : claudeNames;
+      const name = pool[Math.floor(Math.random() * pool.length)];
+      return prev.map((t) =>
+        t.id === id ? { ...t, title: `${name} - ${folder}`, hadClaude: true } : t
+      );
+    });
     // Clear loading state for this terminal
     setLoadingTerminals((prev) => {
       const next = new Map(prev);
@@ -372,7 +373,7 @@ export default function App() {
       )}
       {focusedId && (
         <div className="app__focus-overlay">
-          <div className="app__focus-header">
+          <div className="app__focus-header" onDoubleClick={() => setFocusedId(null)}>
             <span className="app__focus-title">
               {tabs.find((t) => t.id === focusedId)?.title || "Terminal"}
             </span>
