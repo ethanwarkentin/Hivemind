@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Terminal from "./Terminal";
 
 interface ClaudeMommaProps {
@@ -7,13 +7,15 @@ interface ClaudeMommaProps {
   onToggleCollapse: () => void;
 }
 
-type MommaState = "idle" | "checking" | "ready" | "running" | "error";
+type MommaState = "idle" | "checking" | "booting" | "running" | "error";
 
 export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: ClaudeMommaProps) {
   const [state, setState] = useState<MommaState>("idle");
   const [terminalId, setTerminalId] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState("");
   const [hivemindDir, setHivemindDir] = useState("");
+  const dataListenerRef = useRef<((payload: { id: string; data: string }) => void) | null>(null);
+  const outputBufferRef = useRef("");
 
   useEffect(() => {
     window.hivemind.getDir().then(setHivemindDir);
@@ -21,7 +23,7 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
 
   const startMomma = useCallback(async () => {
     setState("checking");
-    const { installed, version } = await window.hivemind.checkClaude();
+    const { installed } = await window.hivemind.checkClaude();
 
     if (!installed) {
       setState("error");
@@ -31,18 +33,45 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
       return;
     }
 
-    setState("ready");
+    setState("booting");
+    outputBufferRef.current = "";
 
-    // Create a terminal in the .hivemind directory
+    // Create terminal in background
     const dir = await window.hivemind.getDir();
     const result = await window.terminal.create({ cols: 80, rows: 10, cwd: dir });
     setTerminalId(result.id);
-    setState("running");
+
+    // Listen for output to detect when Claude is ready
+    const handleData = (payload: { id: string; data: string }) => {
+      if (payload.id !== result.id) return;
+      outputBufferRef.current += payload.data;
+
+      // Strip ANSI
+      const stripped = outputBufferRef.current
+        .replace(/\x1b\][^\x07]*\x07/g, "")
+        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+        .replace(/\x1b[()][A-Z0-9]/g, "")
+        .replace(/\x1b=/g, "")
+        .replace(/\x1b>/g, "");
+
+      // Claude Code shows its banner then a prompt (>)
+      // Look for the ">" prompt or "claude" in output indicating it's ready
+      if (/claude\s*code/i.test(stripped) && />\s*$/.test(stripped)) {
+        setState("running");
+      }
+    };
+    dataListenerRef.current = handleData;
+    window.terminal.onData(handleData);
 
     // Auto-type claude command
     setTimeout(() => {
-      window.terminal.write(result.id, "claude\n");
+      window.terminal.write(result.id, "claude\r");
     }, 500);
+
+    // Fallback: if detection doesn't trigger, show after 10 seconds
+    setTimeout(() => {
+      setState((prev) => (prev === "booting" ? "running" : prev));
+    }, 10000);
   }, []);
 
   const stopMomma = useCallback(() => {
@@ -50,6 +79,7 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
       window.terminal.kill(terminalId);
       setTerminalId("");
       setState("idle");
+      outputBufferRef.current = "";
     }
   }, [terminalId]);
 
@@ -63,21 +93,13 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
     );
   }
 
-  return (
-    <div className="momma">
-      <div className="momma__header">
-        <div className="momma__title-row">
-          <span className="momma__title">ClaudeMomma</span>
-          {state === "running" && (
-            <span className="momma__status momma__status--active">ACTIVE</span>
-          )}
-          {hivemindDir && (
-            <span className="momma__dir" title={hivemindDir}>{hivemindDir}</span>
-          )}
-        </div>
-        <div className="momma__controls">
+  if (state === "idle" || state === "checking" || state === "error") {
+    return (
+      <div className="momma">
+        <div className="momma__idle">
+          <span className="momma__title momma__title--large">ClaudeMomma</span>
           {state === "idle" && (
-            <button className="momma__start" onClick={startMomma}>
+            <button className="momma__start momma__start--large" onClick={startMomma}>
               Start ClaudeMomma
             </button>
           )}
@@ -87,21 +109,49 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
           {state === "error" && (
             <>
               <span className="momma__error">{errorMsg}</span>
-              <button className="momma__start" onClick={() => setState("idle")}>
+              <button className="momma__start momma__start--large" onClick={() => setState("idle")}>
                 Retry
               </button>
             </>
           )}
+        </div>
+        <button className="momma__toggle momma__toggle--corner" onClick={onToggleCollapse} title="Collapse ClaudeMomma">
+          &#9650;
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="momma">
+      <div className="momma__header">
+        <div className="momma__title-row">
+          <span className="momma__title">ClaudeMomma</span>
           {state === "running" && (
-            <button className="momma__stop" onClick={stopMomma}>
-              Stop
-            </button>
+            <span className="momma__status momma__status--active">ACTIVE</span>
           )}
+          {state === "booting" && (
+            <span className="momma__status momma__status--booting">STARTING</span>
+          )}
+          {hivemindDir && state !== "booting" && (
+            <span className="momma__dir" title={hivemindDir}>{hivemindDir}</span>
+          )}
+        </div>
+        <div className="momma__controls">
+          <button className="momma__stop" onClick={stopMomma}>
+            Stop
+          </button>
           <button className="momma__toggle" onClick={onToggleCollapse} title="Collapse ClaudeMomma">
             &#9650;
           </button>
         </div>
       </div>
+      {state === "booting" && (
+        <div className="momma__booting">
+          <div className="app__spinner" />
+          <span>Waking up ClaudeMomma...</span>
+        </div>
+      )}
       {state === "running" && terminalId && (
         <div className="momma__terminal">
           <Terminal id={terminalId} isActive={true} fontSize={fontSize} />
