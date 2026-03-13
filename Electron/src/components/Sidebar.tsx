@@ -23,6 +23,8 @@ interface SidebarProps {
   onFontSizeChange: (size: number) => void;
   restoreSession: boolean;
   onRestoreSessionChange: (enabled: boolean) => void;
+  autoStartMomma: boolean;
+  onAutoStartMommaChange: (enabled: boolean) => void;
 }
 
 const layoutOptions: { value: LayoutMode; label: string }[] = [
@@ -51,6 +53,8 @@ export default function Sidebar({
   onFontSizeChange,
   restoreSession,
   onRestoreSessionChange,
+  autoStartMomma,
+  onAutoStartMommaChange,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -143,6 +147,14 @@ export default function Sidebar({
               onChange={(e) => onRestoreSessionChange(e.target.checked)}
             />
             <span>Restore previous session on startup</span>
+          </label>
+          <label className="settings__checkbox">
+            <input
+              type="checkbox"
+              checked={autoStartMomma}
+              onChange={(e) => onAutoStartMommaChange(e.target.checked)}
+            />
+            <span>Auto-start ClaudeMomma on startup</span>
           </label>
         </div>
       )}

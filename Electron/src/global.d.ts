@@ -17,7 +17,7 @@ interface TerminalAPI {
 }
 
 interface SettingsAPI {
-  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean }>;
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; autoStartMomma: boolean }>;
   set: (key: string, value: unknown) => void;
 }
 
@@ -25,8 +25,8 @@ interface HivemindAPI {
   getDir: () => Promise<string>;
   checkClaude: () => Promise<{ installed: boolean; version: string }>;
   updateTerminals: (terminals: Array<{ id: string; title: string }>) => Promise<void>;
-  saveSession: (terminals: Array<{ id: string; title: string }>) => void;
-  getSession: () => Promise<Array<{ title: string; cwd: string }>>;
+  saveSession: (terminals: Array<{ id: string; title: string; cwd?: string; hadClaude?: boolean }>) => void;
+  getSession: () => Promise<Array<{ title: string; cwd: string; hadClaude: boolean }>>;
 }
 
 declare global {

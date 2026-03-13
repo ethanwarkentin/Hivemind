@@ -4,22 +4,48 @@ import Terminal from "./Terminal";
 interface ClaudeMommaProps {
   fontSize: number;
   collapsed: boolean;
+  autoStart: boolean;
   onToggleCollapse: () => void;
 }
 
 type MommaState = "idle" | "checking" | "booting" | "running" | "error";
 
-export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: ClaudeMommaProps) {
+const bootingMessages = [
+  "Waking up ClaudeMomma...",
+  "Momma's getting her coffee...",
+  "Putting on her boss pants...",
+  "Warming up the mothership...",
+  "Momma's stretching her neurons...",
+  "Loading sass module...",
+  "Calibrating the delegation engine...",
+  "Momma didn't hear the alarm...",
+  "Assembling the hive mind...",
+  "Charging up the mom stare...",
+  "Sharpening her virtual clipboard...",
+  "Momma's on her way, hold tight...",
+  "Brewing a fresh pot of authority...",
+  "Initializing eye-roll subroutine...",
+  "Momma said give her a minute...",
+];
+
+function getBootingMessage() {
+  return bootingMessages[Math.floor(Math.random() * bootingMessages.length)];
+}
+
+export default function ClaudeMomma({ fontSize, collapsed, autoStart, onToggleCollapse }: ClaudeMommaProps) {
   const [state, setState] = useState<MommaState>("idle");
   const [terminalId, setTerminalId] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState("");
   const [hivemindDir, setHivemindDir] = useState("");
+  const [bootMsg, setBootMsg] = useState("");
   const dataListenerRef = useRef<((payload: { id: string; data: string }) => void) | null>(null);
   const outputBufferRef = useRef("");
 
   useEffect(() => {
     window.hivemind.getDir().then(setHivemindDir);
   }, []);
+
+  const autoStartedRef = useRef(false);
 
   const startMomma = useCallback(async () => {
     setState("checking");
@@ -34,6 +60,7 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
     }
 
     setState("booting");
+    setBootMsg(getBootingMessage());
     outputBufferRef.current = "";
 
     // Create terminal in background
@@ -82,6 +109,13 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
       outputBufferRef.current = "";
     }
   }, [terminalId]);
+
+  useEffect(() => {
+    if (autoStart && !autoStartedRef.current && state === "idle") {
+      autoStartedRef.current = true;
+      startMomma();
+    }
+  }, [autoStart, startMomma]);
 
   if (collapsed) {
     return (
@@ -149,7 +183,7 @@ export default function ClaudeMomma({ fontSize, collapsed, onToggleCollapse }: C
       {state === "booting" && (
         <div className="momma__booting">
           <div className="app__spinner" />
-          <span>Waking up ClaudeMomma...</span>
+          <span>{bootMsg}</span>
         </div>
       )}
       {state === "running" && terminalId && (

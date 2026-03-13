@@ -11,6 +11,7 @@ interface TerminalTab {
   id: string;
   title: string;
   cwd?: string;
+  hadClaude?: boolean;
 }
 
 interface PendingClose {
@@ -30,6 +31,7 @@ export default function App() {
   const [closing, setClosing] = useState(false);
   const [mommaCollapsed, setMommaCollapsed] = useState(false);
   const [restoreSession, setRestoreSession] = useState(true);
+  const [autoStartMomma, setAutoStartMomma] = useState(false);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -38,6 +40,7 @@ export default function App() {
       setDefaultCwd(s.defaultCwd);
       setFontSize(s.fontSize);
       setRestoreSession(s.restoreSession);
+      setAutoStartMomma(s.autoStartMomma);
       setSettingsLoaded(true);
     });
   }, []);
@@ -48,13 +51,24 @@ export default function App() {
     window.hivemind.getSession().then(async (session) => {
       if (!session || session.length === 0) return;
       const newTabs: TerminalTab[] = [];
+      const claudeTerminalIds: string[] = [];
       for (const s of session) {
         const result = await window.terminal.create({ cols: 80, rows: 24, cwd: s.cwd });
         newTabs.push({ id: result.id, title: s.title });
+        // If the title has a Claude name (e.g. "ClaudeZilla - Terradome"), Claude was running
+        if (s.hadClaude) {
+          claudeTerminalIds.push(result.id);
+        }
       }
       if (newTabs.length > 0) {
         setTabs(newTabs);
         setActiveTab(newTabs[newTabs.length - 1].id);
+        // Auto-start Claude in terminals that had it running
+        for (const id of claudeTerminalIds) {
+          setTimeout(() => {
+            window.terminal.write(id, "claude\r");
+          }, 1000);
+        }
       }
     });
   }, [settingsLoaded]);
@@ -81,6 +95,11 @@ export default function App() {
   const handleRestoreSessionChange = useCallback((enabled: boolean) => {
     setRestoreSession(enabled);
     window.settings.set("restoreSession", enabled);
+  }, []);
+
+  const handleAutoStartMommaChange = useCallback((enabled: boolean) => {
+    setAutoStartMomma(enabled);
+    window.settings.set("autoStartMomma", enabled);
   }, []);
 
   const createTerminal = useCallback(async () => {
@@ -194,7 +213,7 @@ export default function App() {
   const onClaudeDetected = useCallback((id: string, folder: string) => {
     setTabs((prev) =>
       prev.map((t) =>
-        t.id === id ? { ...t, title: `${getClaudeName()} - ${folder}` } : t
+        t.id === id ? { ...t, title: `${getClaudeName()} - ${folder}`, hadClaude: true } : t
       )
     );
   }, []);
@@ -211,7 +230,7 @@ export default function App() {
     window.hivemind.updateTerminals(list);
     // Only save non-empty sessions (empty = app closing, don't overwrite)
     if (list.length > 0) {
-      const sessionList = tabs.map((t) => ({ id: t.id, title: t.title, cwd: t.cwd || "" }));
+      const sessionList = tabs.map((t) => ({ id: t.id, title: t.title, cwd: t.cwd || "", hadClaude: t.hadClaude || false }));
       window.hivemind.saveSession(sessionList);
     }
   }, [tabs]);
@@ -241,11 +260,14 @@ export default function App() {
         onFontSizeChange={handleFontSizeChange}
         restoreSession={restoreSession}
         onRestoreSessionChange={handleRestoreSessionChange}
+        autoStartMomma={autoStartMomma}
+        onAutoStartMommaChange={handleAutoStartMommaChange}
       />
       <div className="app__main">
         <ClaudeMomma
           fontSize={fontSize}
           collapsed={mommaCollapsed}
+          autoStart={settingsLoaded && autoStartMomma}
           onToggleCollapse={() => setMommaCollapsed((prev) => !prev)}
         />
         <div className="app__content">
