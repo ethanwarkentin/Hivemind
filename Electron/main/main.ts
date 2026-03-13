@@ -22,6 +22,7 @@ function createWindow(): void {
     minHeight: 400,
     title: "Hivemind",
     backgroundColor: "#1a1b26",
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -30,6 +31,8 @@ function createWindow(): void {
   });
 
   win.setMenuBarVisibility(false);
+  win.maximize();
+  win.show();
 
   if (isDev) {
     win.loadURL("http://localhost:5174");
