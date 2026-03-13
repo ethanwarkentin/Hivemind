@@ -41,7 +41,9 @@
       "createStartMenuShortcut": true
     },
     "extraResources": [],
-    "asar": true
+    "asar": true,
+    "npmRebuild": false,
+    "nodeGypRebuild": false
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
