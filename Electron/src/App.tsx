@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import Terminal from "./components/Terminal";
 import Sidebar from "./components/Sidebar";
-import Settings from "./components/Settings";
 import ConfirmModal, { getRandomClaudeMessage } from "./components/ConfirmModal";
 import "./App.css";
 
@@ -178,12 +177,16 @@ export default function App() {
         activeTab={activeTab}
         layout={layout}
         collapsed={sidebarCollapsed}
+        defaultCwd={defaultCwd}
+        fontSize={fontSize}
         onSelect={setActiveTab}
         onClose={closeTerminal}
         onCloseAll={closeAllTerminals}
         onNew={createTerminal}
         onLayoutChange={handleLayoutChange}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        onDefaultCwdChange={handleDefaultCwdChange}
+        onFontSizeChange={handleFontSizeChange}
       />
       <div className="app__main">
         {tabs.length === 0 ? (
@@ -192,12 +195,6 @@ export default function App() {
             <button className="app__empty-btn" onClick={createTerminal}>
               Open a Terminal
             </button>
-            <Settings
-              defaultCwd={defaultCwd}
-              fontSize={fontSize}
-              onDefaultCwdChange={handleDefaultCwdChange}
-              onFontSizeChange={handleFontSizeChange}
-            />
           </div>
         ) : (
           <div className={`app__grid app__grid--${layout}`}>
