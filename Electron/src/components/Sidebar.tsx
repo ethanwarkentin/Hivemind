@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LayoutMode } from "../App";
+import appIcon from "../assets/icon.png";
 
 interface Tab {
   id: string;
@@ -94,7 +95,10 @@ export default function Sidebar({
   return (
     <div className="sidebar">
       <div className="sidebar__header">
-        <h1 className="sidebar__title">Hivemind</h1>
+        <div className="sidebar__title-group">
+          <img src={appIcon} alt="Hivemind" className="sidebar__icon" />
+          <h1 className="sidebar__title">Hivemind</h1>
+        </div>
         <button className="sidebar__collapse" onClick={onToggleCollapse} title="Collapse sidebar">
           &#9664;
         </button>
@@ -208,6 +212,8 @@ export default function Sidebar({
                 />
                 <span>Paulino Mode</span>
               </label>
+              <hr className="settings__divider" />
+              <div className="settings__version">v{__APP_VERSION__}</div>
             </div>
           </div>
         </div>

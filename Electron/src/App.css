@@ -218,6 +218,18 @@
   justify-content: space-between;
 }
 
+.sidebar__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
 .sidebar__title {
   font-size: 16px;
   font-weight: 600;
@@ -403,6 +415,19 @@
 .sidebar__close-all:hover {
   color: var(--danger);
   background: var(--bg-tertiary);
+}
+
+/* ── Dev banner ─────────────────────────────────────────── */
+.app__dev-banner {
+  background: #cc0000;
+  color: #ffffff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 4px 0;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 /* ── Main terminal area ─────────────────────────────────── */
@@ -910,4 +935,11 @@
 .settings__browse-btn:hover {
   background: var(--accent);
   color: var(--bg-primary);
+}
+
+.settings__version {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
 }

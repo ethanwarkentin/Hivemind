@@ -18,6 +18,8 @@ interface PendingClose {
   message: string;
 }
 
+const isDev = window.location.hostname === "localhost";
+
 export default function App() {
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState<string>("");
@@ -326,6 +328,9 @@ export default function App() {
         onThemeChange={handleThemeChange}
       />
       <div className="app__main">
+        {isDev && (
+          <div className="app__dev-banner">DEV BUILD</div>
+        )}
         {closing && (
           <div className="app__loading-overlay">
             <div className="app__spinner" />
