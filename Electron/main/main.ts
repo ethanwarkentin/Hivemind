@@ -10,12 +10,20 @@ const isDev = !app.isPackaged;
 
 // ── Persistent settings ───────────────────────────────────────
 
+interface SessionTerminal {
+  title: string;
+  cwd: string;
+  hadClaude: boolean;
+}
+
 interface AppSettings {
   layout: string;
   defaultCwd: string;
   windowBounds: { x: number; y: number; width: number; height: number } | null;
   windowMaximized: boolean;
   fontSize: number;
+  restoreSession: boolean;
+  session: SessionTerminal[];
 }
 
 const store = new Store({
@@ -25,6 +33,8 @@ const store = new Store({
     windowBounds: null,
     windowMaximized: true,
     fontSize: 14,
+    restoreSession: true,
+    session: [],
   },
 });
 
@@ -93,7 +103,27 @@ ipcMain.handle("settings:get", () => {
     layout: store.get("layout"),
     defaultCwd: store.get("defaultCwd"),
     fontSize: store.get("fontSize"),
+    restoreSession: store.get("restoreSession"),
   };
+});
+
+// ── Session persistence ──────────────────────────────────────
+
+let lastGoodSession: SessionTerminal[] = [];
+
+ipcMain.on("hivemind:saveSession", (_event: IpcMainEvent, terminalList: Array<{ id: string; title: string; cwd?: string; hadClaude?: boolean }>) => {
+  // Save empty sessions too (clears previous session when user closes all terminals)
+  const session: SessionTerminal[] = terminalList.map((t) => ({
+    title: t.title,
+    cwd: t.cwd || store.get("defaultCwd") as string || os.homedir(),
+    hadClaude: t.hadClaude || false,
+  }));
+  lastGoodSession = session;
+  store.set("session", session);
+});
+
+ipcMain.handle("hivemind:getSession", (): SessionTerminal[] => {
+  return store.get("session") as SessionTerminal[];
 });
 
 ipcMain.on(
@@ -120,12 +150,34 @@ ipcMain.handle(
     const cols = opts.cols || 80;
     const rows = opts.rows || 24;
 
+    // Filter out VS Code / IDE related env vars to prevent Claude from auto-connecting
+    const cleanEnv = { ...process.env };
+    const ideVarsToRemove = [
+      'VSCODE_GIT_IPC_HANDLE',
+      'VSCODE_GIT_ASKPASS_NODE',
+      'VSCODE_GIT_ASKPASS_MAIN',
+      'VSCODE_GIT_ASKPASS_EXTRA_ARGS',
+      'VSCODE_IPC_HOOK',
+      'VSCODE_IPC_HOOK_CLI',
+      'VSCODE_PID',
+      'VSCODE_CWD',
+      'VSCODE_NLS_CONFIG',
+      'VSCODE_HANDLES_UNCAUGHT_ERRORS',
+      'VSCODE_AMD_ENTRYPOINT',
+      'ELECTRON_RUN_AS_NODE',
+      'TERM_PROGRAM',
+      'TERM_PROGRAM_VERSION',
+    ];
+    for (const v of ideVarsToRemove) {
+      delete cleanEnv[v];
+    }
+
     const proc = pty.spawn(shell, [], {
       name: "xterm-256color",
       cols,
       rows,
       cwd,
-      env: { ...process.env, TERM: "xterm-256color" } as Record<string, string>,
+      env: { ...cleanEnv, TERM: "xterm-256color" } as Record<string, string>,
     });
 
     terminals.set(id, proc);
@@ -215,9 +267,20 @@ ipcMain.on(
 
 app.whenReady().then(createWindow);
 
+app.on("before-quit", () => {
+  // Persist the last known good session before shutdown
+  if (lastGoodSession.length > 0) {
+    store.set("session", lastGoodSession);
+  }
+});
+
 app.on("window-all-closed", () => {
   for (const [, proc] of terminals) {
-    proc.kill();
+    try {
+      proc.kill();
+    } catch {
+      // ignore — console may already be detached
+    }
   }
   terminals.clear();
   app.quit();

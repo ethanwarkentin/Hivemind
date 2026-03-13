@@ -8,14 +8,16 @@ interface TerminalProps {
   isActive: boolean;
   fontSize?: number;
   onClaudeDetected?: (id: string, cwd: string) => void;
+  onCwdChange?: (id: string, cwd: string) => void;
 }
 
-export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected }: TerminalProps) {
+export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected, onCwdChange }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const claudeDetectedRef = useRef(false);
   const outputBufferRef = useRef("");
+  const cwdBufferRef = useRef("");
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -25,6 +27,7 @@ export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected
       fontSize,
       fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
       theme: {},
+      rightClickSelectsWord: false,
     });
 
     const fitAddon = new FitAddon();
@@ -51,6 +54,32 @@ export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected
     const handleData = (payload: { id: string; data: string }) => {
       if (payload.id === id) {
         xterm.write(payload.data);
+
+        // Track cwd from PowerShell/bash prompt in output
+        if (onCwdChange) {
+          cwdBufferRef.current += payload.data;
+          // Keep buffer small — just need the last prompt line
+          if (cwdBufferRef.current.length > 2000) {
+            cwdBufferRef.current = cwdBufferRef.current.slice(-1000);
+          }
+          // Strip ANSI
+          const clean = cwdBufferRef.current
+            .replace(/\x1b\][^\x07]*\x07/g, "")
+            .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+            .replace(/\x1b[()][A-Z0-9]/g, "")
+            .replace(/\x1b=/g, "")
+            .replace(/\x1b>/g, "");
+          // PowerShell prompt: "PS C:\Users\foo> " or "PS C:\Users\foo\project> "
+          const psMatch = clean.match(/PS\s+([A-Z]:[\\\/][^>\r\n]*)>\s*$/i);
+          if (psMatch) {
+            onCwdChange(id, psMatch[1].trim());
+          }
+          // Bash/zsh prompt with path: "user@host:~/projects$" or "~/projects $"
+          const bashMatch = clean.match(/[:\s](~[\/][^\$#>\r\n]*)\s*[\$#>]\s*$/);
+          if (bashMatch) {
+            onCwdChange(id, bashMatch[1].trim());
+          }
+        }
 
         // Watch for Claude startup - look for the cwd path Claude prints
         if (!claudeDetectedRef.current && onClaudeDetected) {
@@ -121,8 +150,23 @@ export default function Terminal({ id, isActive, fontSize = 14, onClaudeDetected
     });
     resizeObserver.observe(containerRef.current);
 
+    // Right-click to paste
+    const handleContextMenu = async (e: MouseEvent) => {
+      e.preventDefault();
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          window.terminal.write(id, text);
+        }
+      } catch {
+        // Clipboard access denied or empty
+      }
+    };
+    containerRef.current.addEventListener("contextmenu", handleContextMenu);
+
     return () => {
       resizeObserver.disconnect();
+      containerRef.current?.removeEventListener("contextmenu", handleContextMenu);
       xterm.dispose();
     };
   }, [id, onClaudeDetected]);

@@ -21,6 +21,8 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onDefaultCwdChange: (cwd: string) => void;
   onFontSizeChange: (size: number) => void;
+  restoreSession: boolean;
+  onRestoreSessionChange: (enabled: boolean) => void;
 }
 
 const layoutOptions: { value: LayoutMode; label: string }[] = [
@@ -47,6 +49,8 @@ export default function Sidebar({
   onToggleCollapse,
   onDefaultCwdChange,
   onFontSizeChange,
+  restoreSession,
+  onRestoreSessionChange,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -132,6 +136,14 @@ export default function Sidebar({
               onChange={(e) => onFontSizeChange(Number(e.target.value))}
             />
           </div>
+          <label className="settings__checkbox">
+            <input
+              type="checkbox"
+              checked={restoreSession}
+              onChange={(e) => onRestoreSessionChange(e.target.checked)}
+            />
+            <span>Restore previous session on startup</span>
+          </label>
         </div>
       )}
       <div className="sidebar__list">
