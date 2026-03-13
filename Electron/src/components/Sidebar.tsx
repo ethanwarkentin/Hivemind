@@ -23,6 +23,8 @@ interface SidebarProps {
   onFontSizeChange: (size: number) => void;
   restoreSession: boolean;
   onRestoreSessionChange: (enabled: boolean) => void;
+  theme: string;
+  onThemeChange: (theme: string) => void;
 }
 
 const layoutOptions: { value: LayoutMode; label: string }[] = [
@@ -51,6 +53,8 @@ export default function Sidebar({
   onFontSizeChange,
   restoreSession,
   onRestoreSessionChange,
+  theme,
+  onThemeChange,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -194,6 +198,15 @@ export default function Sidebar({
                   onChange={(e) => onRestoreSessionChange(e.target.checked)}
                 />
                 <span>Restore previous session on startup</span>
+              </label>
+              <hr className="settings__divider" />
+              <label className="settings__checkbox settings__checkbox--paulino">
+                <input
+                  type="checkbox"
+                  checked={theme === "paulino"}
+                  onChange={(e) => onThemeChange(e.target.checked ? "paulino" : "dark")}
+                />
+                <span>Paulino Mode</span>
               </label>
             </div>
           </div>

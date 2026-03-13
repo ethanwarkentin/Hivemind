@@ -32,6 +32,7 @@ export default function App() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [sessionRestoreAttempted, setSessionRestoreAttempted] = useState(false);
   const [loadingTerminals, setLoadingTerminals] = useState<Map<string, string>>(new Map());
+  const [theme, setTheme] = useState<string>("dark");
 
   const claudeStartupMessages = [
     "Waking up your favorite AI child...",
@@ -61,6 +62,7 @@ export default function App() {
       setDefaultCwd(s.defaultCwd);
       setFontSize(s.fontSize);
       setRestoreSession(s.restoreSession);
+      setTheme(s.theme || "dark");
       setSettingsLoaded(true);
     });
   }, []);
@@ -149,6 +151,12 @@ export default function App() {
   const handleRestoreSessionChange = useCallback((enabled: boolean) => {
     setRestoreSession(enabled);
     window.settings.set("restoreSession", enabled);
+  }, []);
+
+  // Persist theme changes
+  const handleThemeChange = useCallback((newTheme: string) => {
+    setTheme(newTheme);
+    window.settings.set("theme", newTheme);
   }, []);
 
   const createTerminal = useCallback(async () => {
@@ -296,7 +304,7 @@ export default function App() {
   if (!settingsLoaded) return null;
 
   return (
-    <div className="app">
+    <div className={`app${theme === "paulino" ? " app--paulino" : ""}`}>
       <Sidebar
         tabs={tabs}
         activeTab={activeTab}
@@ -314,6 +322,8 @@ export default function App() {
         onFontSizeChange={handleFontSizeChange}
         restoreSession={restoreSession}
         onRestoreSessionChange={handleRestoreSessionChange}
+        theme={theme}
+        onThemeChange={handleThemeChange}
       />
       <div className="app__main">
         {closing && (
@@ -351,7 +361,7 @@ export default function App() {
                   </button>
                 </div>
                 <div className="app__grid-terminal">
-                  <Terminal id={tab.id} isActive={layout === "single" || true} fontSize={fontSize} onClaudeDetected={onClaudeDetected} onCwdChange={onCwdChange} />
+                  <Terminal id={tab.id} isActive={layout === "single" || true} fontSize={fontSize} theme={theme} onClaudeDetected={onClaudeDetected} onCwdChange={onCwdChange} />
                 </div>
                 {loadingTerminals.has(tab.id) && (
                   <div className="app__terminal-loading">

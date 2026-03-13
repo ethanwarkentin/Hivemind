@@ -28,6 +28,7 @@ interface AppSettings {
   windowMaximized: boolean;
   fontSize: number;
   restoreSession: boolean;
+  theme: string;
   session: SessionTerminal[];
 }
 
@@ -39,6 +40,7 @@ const store = new Store({
     windowMaximized: true,
     fontSize: 14,
     restoreSession: true,
+    theme: "dark",
     session: [],
   },
 });
@@ -66,7 +68,7 @@ function createWindow(): void {
     minWidth: 600,
     minHeight: 400,
     title: "Hivemind",
-    backgroundColor: "#1a1b26",
+    backgroundColor: "#0d0e14",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -109,6 +111,7 @@ ipcMain.handle("settings:get", () => {
     defaultCwd: store.get("defaultCwd"),
     fontSize: store.get("fontSize"),
     restoreSession: store.get("restoreSession"),
+    theme: store.get("theme"),
   };
 });
 
