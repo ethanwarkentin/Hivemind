@@ -256,17 +256,82 @@ ipcMain.handle(
 
     try {
       if (os.platform() === "win32") {
+        // Get all processes with PIDs, parent PIDs, and command lines
+        // Claude runs as node.exe with claude-code in the command line
         const output = execSync(
-          `wmic process where "ParentProcessId=${proc.pid}" get Name /format:csv`,
-          { encoding: "utf-8", timeout: 3000 }
+          `wmic process get ProcessId,ParentProcessId,CommandLine /format:csv`,
+          { encoding: "utf-8", timeout: 5000 }
         );
-        return /claude/i.test(output);
+
+        // Parse CSV output into maps
+        const lines = output.trim().split("\n").filter(line => line.trim());
+        const children = new Map<number, number[]>();
+        const cmdLines = new Map<number, string>();
+
+        for (const line of lines) {
+          // CSV format: Node,CommandLine,ParentProcessId,ProcessId
+          // But CommandLine can contain commas, so we need to parse carefully
+          // Find the last two comma-separated values (ppid and pid)
+          const match = line.match(/,(\d+),(\d+)\s*$/);
+          if (match) {
+            const ppid = parseInt(match[1], 10);
+            const pid = parseInt(match[2], 10);
+            // Extract command line (everything between first comma and the ,ppid,pid suffix)
+            const firstComma = line.indexOf(",");
+            const cmdLineEnd = line.lastIndexOf(`,${match[1]},${match[2]}`);
+            const cmdLine = firstComma >= 0 && cmdLineEnd > firstComma
+              ? line.substring(firstComma + 1, cmdLineEnd)
+              : "";
+
+            if (!isNaN(pid) && !isNaN(ppid)) {
+              cmdLines.set(pid, cmdLine);
+              if (!children.has(ppid)) {
+                children.set(ppid, []);
+              }
+              children.get(ppid)!.push(pid);
+            }
+          }
+        }
+
+        // Recursively find all descendants of the shell process
+        const findDescendants = (pid: number, visited: Set<number>): number[] => {
+          if (visited.has(pid)) return [];
+          visited.add(pid);
+          const directChildren = children.get(pid) || [];
+          let all = [...directChildren];
+          for (const child of directChildren) {
+            all = all.concat(findDescendants(child, visited));
+          }
+          return all;
+        };
+
+        const descendants = findDescendants(proc.pid, new Set());
+
+        // Check if any descendant has "claude" in its command line
+        for (const pid of descendants) {
+          const cmdLine = cmdLines.get(pid);
+          if (cmdLine && /claude/i.test(cmdLine)) {
+            return true;
+          }
+        }
+        return false;
       } else {
-        const output = execSync(
-          `ps --ppid ${proc.pid} -o comm= 2>/dev/null || pgrep -P ${proc.pid} -l`,
-          { encoding: "utf-8", timeout: 3000 }
-        );
-        return /claude/i.test(output);
+        // On Unix, use pstree or recursive ps to find all descendants
+        // First try pgrep with -P to get all descendants recursively
+        try {
+          const output = execSync(
+            `pstree -p ${proc.pid} 2>/dev/null || ps -e -o pid,ppid,comm`,
+            { encoding: "utf-8", timeout: 5000 }
+          );
+          return /claude/i.test(output);
+        } catch {
+          // Fallback to checking direct children
+          const output = execSync(
+            `ps --ppid ${proc.pid} -o comm= 2>/dev/null || pgrep -P ${proc.pid} -l`,
+            { encoding: "utf-8", timeout: 3000 }
+          );
+          return /claude/i.test(output);
+        }
       }
     } catch {
       return false;
