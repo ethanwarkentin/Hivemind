@@ -50,6 +50,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let active = true;
 
     const xterm = new XTerm({
       cursorBlink: true,
@@ -89,6 +90,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
 
     // Receive PTY output
     const handleData = (payload: { id: string; data: string }) => {
+      if (!active) return;
       if (payload.id === id) {
         xterm.write(payload.data);
 
@@ -170,6 +172,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
 
     // Handle process exit
     const handleExit = (payload: { id: string; exitCode: number }) => {
+      if (!active) return;
       if (payload.id === id) {
         xterm.write("\r\n\x1b[31m[Process exited]\x1b[0m\r\n");
       }
@@ -191,6 +194,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
     // We use the tracked selection since xterm may clear it before contextmenu fires
     const handleContextMenu = async (e: MouseEvent) => {
       e.preventDefault();
+      if (!active) return;
       const selection = xterm.getSelection() || lastSelectionRef.current;
       if (selection) {
         await navigator.clipboard.writeText(selection);
@@ -209,9 +213,36 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
     };
     containerRef.current.addEventListener("contextmenu", handleContextMenu);
 
+    // Drag-and-drop: paste file path into terminal (like native Windows Terminal)
+    const handleDragOver = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }
+    };
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      if (!active) return;
+      const files = e.dataTransfer?.files;
+      if (!files || files.length === 0) return;
+      const paths = Array.from(files).map((f) => {
+        const p = (window as any).electronUtils.getPathForFile(f) as string;
+        return p && p.includes(" ") ? `"${p}"` : p;
+      }).filter(Boolean);
+      if (paths.length > 0) {
+        window.terminal.write(id, paths.join(" "));
+        xterm.focus();
+      }
+    };
+    containerRef.current.addEventListener("dragover", handleDragOver);
+    containerRef.current.addEventListener("drop", handleDrop);
+
     return () => {
+      active = false;
       resizeObserver.disconnect();
       containerRef.current?.removeEventListener("contextmenu", handleContextMenu);
+      containerRef.current?.removeEventListener("dragover", handleDragOver);
+      containerRef.current?.removeEventListener("drop", handleDrop);
       xterm.dispose();
     };
   }, [id, onClaudeDetected]);
