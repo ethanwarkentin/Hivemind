@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 export interface TerminalAPI {
   create: (opts?: {
@@ -59,6 +59,11 @@ const hivemindAPI: HivemindAPI = {
   getSession: () => ipcRenderer.invoke("hivemind:getSession"),
 };
 
+const utilsAPI = {
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
 contextBridge.exposeInMainWorld("settings", settingsAPI);
 contextBridge.exposeInMainWorld("hivemind", hivemindAPI);
+contextBridge.exposeInMainWorld("electronUtils", utilsAPI);
