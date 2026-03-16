@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import Terminal from "./components/Terminal";
 import Sidebar from "./components/Sidebar";
 import ConfirmModal, { getRandomClaudeMessage } from "./components/ConfirmModal";
+import FightModal from "./components/FightModal";
+import FightPanel from "./components/FightPanel";
 import "./App.css";
 
 export type LayoutMode = "auto" | "single" | "columns" | "rows" | "grid-2x2" | "grid-3x3";
@@ -34,6 +36,9 @@ export default function App() {
   const [sessionRestoreAttempted, setSessionRestoreAttempted] = useState(false);
   const [loadingTerminals, setLoadingTerminals] = useState<Map<string, string>>(new Map());
   const [theme, setTheme] = useState<string>("dark");
+  const [fightModalOpen, setFightModalOpen] = useState(false);
+  const [activeFight, setActiveFight] = useState<FightState | null>(null);
+  const [mommaTabId, setMommaTabId] = useState<string | null>(null);
 
   const claudeStartupMessages = [
     "Waking up your favorite AI child...",
@@ -123,6 +128,58 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [focusedId]);
+
+  // Listen for fight state updates from main process
+  useEffect(() => {
+    window.fight.onStateUpdate((state: FightState) => {
+      setActiveFight(state);
+    });
+    return () => {
+      window.fight.removeAllListeners();
+    };
+  }, []);
+
+  const startFight = useCallback(
+    async (fighter1Id: string, fighter2Id: string, name: string, description: string) => {
+      const fighter1Tab = tabs.find((t) => t.id === fighter1Id);
+      const fighter2Tab = tabs.find((t) => t.id === fighter2Id);
+      if (!fighter1Tab || !fighter2Tab) return;
+
+      setFightModalOpen(false);
+
+      const result = await window.fight.create({
+        name,
+        description,
+        fighter1: { title: fighter1Tab.title, terminal_id: fighter1Id },
+        fighter2: { title: fighter2Tab.title, terminal_id: fighter2Id },
+      });
+
+      // Add Momma's terminal as a tab
+      const mommaTab: TerminalTab = {
+        id: result.mommaTerminal.id,
+        title: "CLAUDE MOMMA",
+        cwd: result.mommaTerminal.cwd,
+      };
+      setTabs((prev) => [...prev, mommaTab]);
+      setActiveTab(result.mommaTerminal.id);
+      setMommaTabId(result.mommaTerminal.id);
+      setActiveFight(result.fightState);
+
+      // Start Claude in Momma's terminal after a short delay
+      setTimeout(() => {
+        window.terminal.write(result.mommaTerminal.id, "claude\r");
+      }, 1000);
+
+      // After Claude starts, give Momma her first instruction
+      setTimeout(() => {
+        window.terminal.write(
+          result.mommaTerminal.id,
+          "A fight has been initiated. Read 00_context.md and state.json in this folder. Begin orchestrating by updating state.json with the opening prompt for Fighter 1. Set turn to fighter1, write a clear next_prompt with full file paths, and set prompt_seq to 1.\r"
+        );
+      }, 8000);
+    },
+    [tabs]
+  );
 
   // Sidebar select exits focus mode
   const handleSidebarSelect = useCallback((id: string) => {
@@ -258,6 +315,13 @@ export default function App() {
 
   const onClaudeDetected = useCallback((id: string, folder: string) => {
     setTabs((prev) => {
+      // Don't rename Momma — she keeps her title
+      const isMomma = prev.find((t) => t.id === id)?.title === "CLAUDE MOMMA";
+      if (isMomma) {
+        return prev.map((t) =>
+          t.id === id ? { ...t, hadClaude: true } : t
+        );
+      }
       const usedNames = new Set(prev.map((t) => t.title.split(" - ")[0]));
       const available = claudeNames.filter((n) => !usedNames.has(n));
       const pool = available.length > 0 ? available : claudeNames;
@@ -315,6 +379,9 @@ export default function App() {
         onRestoreSessionChange={handleRestoreSessionChange}
         theme={theme}
         onThemeChange={handleThemeChange}
+        onStartFight={() => setFightModalOpen(true)}
+        hasFight={activeFight !== null && activeFight.status !== "resolved"}
+        mommaTabId={mommaTabId}
       />
       <div className="app__main">
         {isDev && (
@@ -328,15 +395,15 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <div className={`app__grid app__grid--${layout}${visibleTabs.length === 1 ? ' app__grid--single-item' : ''}`}>
+          <div className={`app__grid app__grid--${layout}${visibleTabs.length + (activeFight ? 1 : 0) === 1 ? ' app__grid--single-item' : ''}`}>
             {visibleTabs.map((tab) => (
               <div
                 key={tab.id}
-                className={`app__grid-cell ${tab.id === activeTab ? "app__grid-cell--active" : ""} ${focusedId === tab.id ? "app__grid-cell--focused" : ""}`}
+                className={`app__grid-cell ${tab.id === activeTab ? "app__grid-cell--active" : ""} ${focusedId === tab.id ? "app__grid-cell--focused" : ""}${tab.id === mommaTabId ? " app__grid-cell--momma" : ""}`}
                 onClick={() => setActiveTab(tab.id)}
               >
                 <div className="app__grid-header" onDoubleClick={() => setFocusedId((prev) => (prev === tab.id ? null : tab.id))}>
-                  <span className="app__grid-title">{tab.title}</span>
+                  <span className={`app__grid-title${tab.id === mommaTabId ? " app__grid-title--momma" : ""}`}>{tab.title}</span>
                   <button
                     className="app__grid-close"
                     onClick={(e) => {
@@ -359,6 +426,22 @@ export default function App() {
                 )}
               </div>
             ))}
+            {activeFight && (
+              <div className="app__grid-cell app__grid-cell--fight">
+                <FightPanel
+                  fight={activeFight}
+                  onPause={() => window.fight.pause()}
+                  onResume={() => window.fight.resume()}
+                  onResolve={(resolution) => window.fight.resolve(resolution)}
+                  onMessage={(msg) => window.fight.message(msg)}
+                  onEnd={() => {
+                    window.fight.end();
+                    setActiveFight(null);
+                    setMommaTabId(null);
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -367,6 +450,13 @@ export default function App() {
           message={pendingClose.message}
           onConfirm={confirmClose}
           onCancel={cancelClose}
+        />
+      )}
+      {fightModalOpen && (
+        <FightModal
+          tabs={tabs}
+          onStart={startFight}
+          onCancel={() => setFightModalOpen(false)}
         />
       )}
       {focusedId && (

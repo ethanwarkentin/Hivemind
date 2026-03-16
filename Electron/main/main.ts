@@ -5,6 +5,7 @@ import * as path from "path";
 import * as os from "os";
 import * as pty from "node-pty";
 import { execSync } from "child_process";
+import { FightManager, FightCreateOpts } from "./fight-manager";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Store = require("electron-store").default;
 
@@ -351,6 +352,97 @@ ipcMain.on(
     }
   }
 );
+
+// ── Fight Club IPC ────────────────────────────────────────────
+
+const fightManager = new FightManager((id: string, data: string) => {
+  const proc = terminals.get(id);
+  if (proc) proc.write(data);
+});
+
+ipcMain.handle(
+  "fight:create",
+  async (
+    _event: IpcMainInvokeEvent,
+    opts: FightCreateOpts
+  ) => {
+    const { fightPath, state } = fightManager.createFight(opts);
+
+    // Spawn Momma's terminal in the fight folder
+    const id = `term_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const shell = os.platform() === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/bash";
+
+    const cleanEnv = { ...process.env };
+    const ideVarsToRemove = [
+      'VSCODE_GIT_IPC_HANDLE', 'VSCODE_GIT_ASKPASS_NODE',
+      'VSCODE_GIT_ASKPASS_MAIN', 'VSCODE_GIT_ASKPASS_EXTRA_ARGS',
+      'VSCODE_IPC_HOOK', 'VSCODE_IPC_HOOK_CLI', 'VSCODE_PID',
+      'VSCODE_CWD', 'VSCODE_NLS_CONFIG', 'VSCODE_HANDLES_UNCAUGHT_ERRORS',
+      'VSCODE_AMD_ENTRYPOINT', 'ELECTRON_RUN_AS_NODE',
+      'TERM_PROGRAM', 'TERM_PROGRAM_VERSION',
+    ];
+    for (const v of ideVarsToRemove) {
+      delete cleanEnv[v];
+    }
+
+    const proc = pty.spawn(shell, [], {
+      name: "xterm-256color",
+      cols: 80,
+      rows: 24,
+      cwd: fightPath,
+      env: { ...cleanEnv, TERM: "xterm-256color" } as Record<string, string>,
+    });
+
+    terminals.set(id, proc);
+
+    proc.onData((data: string) => {
+      const wins = BrowserWindow.getAllWindows();
+      for (const w of wins) {
+        w.webContents.send("terminal:data", { id, data });
+      }
+    });
+
+    proc.onExit(({ exitCode }: { exitCode: number }) => {
+      const wins = BrowserWindow.getAllWindows();
+      for (const w of wins) {
+        w.webContents.send("terminal:exit", { id, exitCode });
+      }
+      terminals.delete(id);
+    });
+
+    fightManager.setMommaTerminalId(id);
+    fightManager.startPolling();
+
+    return {
+      fightState: state,
+      mommaTerminal: { id, shell, cwd: fightPath, pid: proc.pid },
+    };
+  }
+);
+
+ipcMain.handle("fight:getState", () => {
+  return fightManager.getActiveFight();
+});
+
+ipcMain.on("fight:message", (_event: IpcMainEvent, message: string) => {
+  fightManager.sendToMomma(message);
+});
+
+ipcMain.on("fight:pause", () => {
+  fightManager.pauseFight();
+});
+
+ipcMain.on("fight:resume", () => {
+  fightManager.resumeFight();
+});
+
+ipcMain.on("fight:resolve", (_event: IpcMainEvent, resolution?: string) => {
+  fightManager.resolveFight(resolution);
+});
+
+ipcMain.on("fight:end", () => {
+  fightManager.endFight();
+});
 
 // ── Updater IPC ───────────────────────────────────────────────
 

@@ -81,7 +81,8 @@
 .app {
   display: flex;
   flex-direction: row;
-  height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg-primary);
   background-image: var(--hex-pattern);
   color: var(--text-primary);
@@ -435,6 +436,9 @@
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Grid layout */
@@ -443,8 +447,10 @@
   grid-template-columns: repeat(2, 1fr);
   grid-auto-rows: 1fr;
   gap: 2px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: var(--border);
+  overflow: hidden;
 }
 
 .app__grid--single-item {
@@ -456,6 +462,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
   background: var(--bg-primary);
   border: 1px solid transparent;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -552,7 +559,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
   gap: 16px;
   color: var(--text-muted);
   background-image: var(--hex-pattern);
@@ -996,4 +1003,417 @@
 .settings__update-status--error {
   color: #f87171;
   cursor: help;
+}
+
+/* ── Fight Button (Sidebar) ────────────────────────────── */
+.sidebar__fight-btn {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 10px 16px;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+}
+
+.sidebar__fight-btn:hover {
+  color: var(--danger);
+  background: var(--bg-tertiary);
+}
+
+.sidebar__fight-btn--active {
+  color: var(--danger);
+  background: var(--bg-tertiary);
+  animation: fight-pulse 2s ease-in-out infinite;
+}
+
+.sidebar__icon-btn--fight {
+  background: none;
+  color: var(--text-muted);
+}
+
+.sidebar__icon-btn--fight:hover {
+  background: var(--danger);
+  color: var(--bg-primary);
+}
+
+.sidebar__icon-btn--fight-active {
+  color: var(--danger);
+  animation: fight-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fight-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Fight Modal ───────────────────────────────────────── */
+.fight-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px var(--shadow), 0 0 30px rgba(199, 84, 80, 0.2);
+  overflow: hidden;
+}
+
+.fight-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.fight-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--danger);
+  margin: 0;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.fight-modal__body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fight-modal__warning {
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+.fight-modal__select {
+  width: 100%;
+}
+
+.fight-modal__vs {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--danger);
+  letter-spacing: 4px;
+  padding: 4px 0;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+.fight-modal__textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.fight-modal__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.fight-modal__start-btn {
+  background: var(--danger) !important;
+  color: var(--bg-primary) !important;
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 14px !important;
+  padding: 10px 28px !important;
+}
+
+.fight-modal__start-btn:hover:not(:disabled) {
+  background: var(--danger-hover) !important;
+  box-shadow: 0 0 20px rgba(199, 84, 80, 0.4);
+}
+
+.fight-modal__start-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Momma Styling (Sidebar) ────────────────────────────── */
+.sidebar__item--momma {
+  border-left: 3px solid var(--danger) !important;
+}
+
+.sidebar__item--momma.sidebar__item--active {
+  background: rgba(199, 84, 80, 0.1);
+}
+
+.sidebar__index--momma {
+  background: var(--danger) !important;
+  color: var(--bg-primary) !important;
+  font-weight: 800;
+}
+
+.sidebar__item-title--momma {
+  color: var(--danger) !important;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.sidebar__icon-item--momma {
+  background: var(--danger) !important;
+  color: var(--bg-primary) !important;
+  font-weight: 800;
+}
+
+/* ── Momma Styling (Grid Cell) ─────────────────────────── */
+.app__grid-cell--momma {
+  border-color: var(--danger) !important;
+  box-shadow: inset 0 0 20px rgba(199, 84, 80, 0.15);
+}
+
+.app__grid-cell--momma .app__grid-header {
+  background: rgba(199, 84, 80, 0.15);
+  border-bottom-color: var(--danger);
+}
+
+.app__grid-title--momma {
+  color: var(--danger) !important;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── Fight Panel (Grid Cell) ───────────────────────────── */
+.app__grid-cell--fight {
+  border-color: var(--danger) !important;
+  box-shadow: inset 0 0 20px rgba(199, 84, 80, 0.15);
+  cursor: default;
+  min-height: 0;
+}
+
+.fight-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-primary);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fight-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.fight-panel__badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: var(--danger);
+  color: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.fight-panel__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fight-panel__fighters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.fight-panel__fighter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+  min-width: 0;
+}
+
+.fight-panel__fighter--active {
+  border-color: var(--danger);
+  background: var(--bg-tertiary);
+}
+
+.fight-panel__fighter-label {
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  padding: 1px 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.fight-panel__fighter--active .fight-panel__fighter-label {
+  background: var(--danger);
+  color: var(--bg-primary);
+}
+
+.fight-panel__fighter-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.fight-panel__vs {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.fight-panel__summary {
+  padding: 0 16px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.fight-panel__turn {
+  padding: 0 16px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.fight-panel__turn strong {
+  color: var(--danger);
+}
+
+.fight-panel__controls {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  flex-shrink: 0;
+}
+
+.fight-panel__btn {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.fight-panel__btn:hover {
+  border-color: var(--accent);
+}
+
+.fight-panel__btn--pause:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--bg-primary);
+}
+
+.fight-panel__btn--resume {
+  background: var(--success);
+  color: var(--bg-primary);
+  border-color: var(--success);
+}
+
+.fight-panel__btn--resume:hover {
+  background: var(--success-hover);
+  border-color: var(--success-hover);
+}
+
+.fight-panel__btn--resolve {
+  background: var(--danger);
+  color: var(--bg-primary);
+  border-color: var(--danger);
+}
+
+.fight-panel__btn--resolve:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
+}
+
+.fight-panel__btn--end {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.fight-panel__input-area {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.fight-panel__input {
+  flex: 1;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.fight-panel__input:focus {
+  border-color: var(--danger);
+}
+
+.fight-panel__input::placeholder {
+  color: var(--text-muted);
+}
+
+.fight-panel__send {
+  background: var(--danger);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-weight: 600;
+}
+
+.fight-panel__send:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+.fight-panel__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

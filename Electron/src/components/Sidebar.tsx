@@ -28,6 +28,9 @@ interface SidebarProps {
   onRestoreSessionChange: (enabled: boolean) => void;
   theme: string;
   onThemeChange: (theme: string) => void;
+  onStartFight: () => void;
+  hasFight: boolean;
+  mommaTabId: string | null;
 }
 
 const layoutOptions: { value: LayoutMode; label: string }[] = [
@@ -58,6 +61,9 @@ export default function Sidebar({
   onRestoreSessionChange,
   theme,
   onThemeChange,
+  onStartFight,
+  hasFight,
+  mommaTabId,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -108,15 +114,22 @@ export default function Sidebar({
           {tabs.map((tab, index) => (
             <button
               key={tab.id}
-              className={`sidebar__icon-item ${tab.id === activeTab ? "sidebar__icon-item--active" : ""}`}
+              className={`sidebar__icon-item ${tab.id === activeTab ? "sidebar__icon-item--active" : ""}${tab.id === mommaTabId ? " sidebar__icon-item--momma" : ""}`}
               onClick={() => onSelect(tab.id)}
               title={tab.title}
             >
-              {index + 1}
+              {tab.id === mommaTabId ? "M" : index + 1}
             </button>
           ))}
         </div>
         <div className="sidebar__actions sidebar__actions--collapsed">
+          <button
+            className={`sidebar__icon-btn sidebar__icon-btn--fight${hasFight ? " sidebar__icon-btn--fight-active" : ""}`}
+            onClick={onStartFight}
+            title={hasFight ? "Fight in progress" : "Start a fight"}
+          >
+            &#9876;
+          </button>
           <button className="sidebar__icon-btn sidebar__icon-btn--settings" onClick={() => setSettingsOpen(true)} title="Settings">
             &#9881;
           </button>
@@ -146,12 +159,12 @@ export default function Sidebar({
         {tabs.map((tab, index) => (
           <div
             key={tab.id}
-            className={`sidebar__item ${tab.id === activeTab ? "sidebar__item--active" : ""}`}
+            className={`sidebar__item ${tab.id === activeTab ? "sidebar__item--active" : ""}${tab.id === mommaTabId ? " sidebar__item--momma" : ""}`}
             onClick={() => onSelect(tab.id)}
             title={tab.title}
           >
-            <span className="sidebar__index">{index + 1}</span>
-            <span className="sidebar__item-title">{tab.title}</span>
+            <span className={`sidebar__index${tab.id === mommaTabId ? " sidebar__index--momma" : ""}`}>{tab.id === mommaTabId ? "M" : index + 1}</span>
+            <span className={`sidebar__item-title${tab.id === mommaTabId ? " sidebar__item-title--momma" : ""}`}>{tab.title}</span>
             <button
               className="sidebar__close"
               onClick={(e) => {
@@ -166,6 +179,13 @@ export default function Sidebar({
         ))}
       </div>
       <div className="sidebar__actions">
+        <button
+          className={`sidebar__fight-btn${hasFight ? " sidebar__fight-btn--active" : ""}`}
+          onClick={onStartFight}
+          title={hasFight ? "Fight in progress" : "Start a fight"}
+        >
+          &#9876; {hasFight ? "Fight in Progress" : "Fight!"}
+        </button>
         <button className="sidebar__settings-toggle" onClick={() => setSettingsOpen(true)}>
           &#9881; Settings
         </button>
