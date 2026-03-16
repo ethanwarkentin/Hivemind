@@ -1,4 +1,6 @@
-import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, IpcMainEvent, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, IpcMainEvent, dialog, shell } from "electron";
+import * as https from "https";
+import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as pty from "node-pty";
@@ -349,6 +351,148 @@ ipcMain.on(
     }
   }
 );
+
+// ── Updater IPC ───────────────────────────────────────────────
+
+const GITHUB_REPO = "ethanwarkentin/Hivemind";
+const CURRENT_VERSION = app.getVersion();
+
+interface GitHubRelease {
+  tag_name: string;
+  body: string;
+  assets: Array<{
+    name: string;
+    browser_download_url: string;
+  }>;
+}
+
+function fetchJson<T>(url: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      headers: { "User-Agent": "Hivemind-Updater" },
+    };
+    https.get(options, (res) => {
+      // Handle redirects
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        const redirectUrl = res.headers.location;
+        if (redirectUrl) {
+          fetchJson<T>(redirectUrl).then(resolve).catch(reject);
+          return;
+        }
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}`));
+        return;
+      }
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on("error", reject);
+  });
+}
+
+function compareVersions(v1: string, v2: string): number {
+  const parts1 = v1.replace(/^v/, "").split(".").map(Number);
+  const parts2 = v2.replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 > p2) return 1;
+    if (p1 < p2) return -1;
+  }
+  return 0;
+}
+
+ipcMain.handle("updater:checkForUpdate", async () => {
+  try {
+    const release = await fetchJson<GitHubRelease>(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
+    );
+    const latestVersion = release.tag_name.replace(/^v/, "");
+    const hasUpdate = compareVersions(latestVersion, CURRENT_VERSION) > 0;
+
+    // Find the exe installer asset
+    const exeAsset = release.assets.find(
+      (a) => a.name.endsWith(".exe") && !a.name.includes("blockmap")
+    );
+
+    return {
+      hasUpdate,
+      currentVersion: CURRENT_VERSION,
+      latestVersion,
+      downloadUrl: exeAsset?.browser_download_url,
+      releaseNotes: release.body,
+    };
+  } catch (err) {
+    return {
+      hasUpdate: false,
+      currentVersion: CURRENT_VERSION,
+      error: err instanceof Error ? err.message : "Failed to check for updates",
+    };
+  }
+});
+
+function downloadFile(url: string, destPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      headers: { "User-Agent": "Hivemind-Updater" },
+    };
+    https.get(options, (res) => {
+      // Handle redirects
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        const redirectUrl = res.headers.location;
+        if (redirectUrl) {
+          downloadFile(redirectUrl, destPath).then(resolve).catch(reject);
+          return;
+        }
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}`));
+        return;
+      }
+      const fileStream = fs.createWriteStream(destPath);
+      res.pipe(fileStream);
+      fileStream.on("finish", () => {
+        fileStream.close();
+        resolve();
+      });
+      fileStream.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
+ipcMain.handle("updater:downloadAndInstall", async (_event: IpcMainInvokeEvent, downloadUrl: string) => {
+  try {
+    const tempDir = app.getPath("temp");
+    const fileName = `Hivemind-Setup-${Date.now()}.exe`;
+    const destPath = path.join(tempDir, fileName);
+
+    await downloadFile(downloadUrl, destPath);
+
+    // Launch the installer and quit the app
+    shell.openPath(destPath);
+    setTimeout(() => app.quit(), 1000);
+
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to download update",
+    };
+  }
+});
 
 // ── App lifecycle ─────────────────────────────────────────────
 

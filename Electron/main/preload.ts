@@ -59,6 +59,25 @@ const hivemindAPI: HivemindAPI = {
   getSession: () => ipcRenderer.invoke("hivemind:getSession"),
 };
 
+export interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  downloadUrl?: string;
+  releaseNotes?: string;
+  error?: string;
+}
+
+export interface UpdaterAPI {
+  checkForUpdate: () => Promise<UpdateInfo>;
+  downloadAndInstall: (downloadUrl: string) => Promise<{ success: boolean; error?: string }>;
+}
+
+const updaterAPI: UpdaterAPI = {
+  checkForUpdate: () => ipcRenderer.invoke("updater:checkForUpdate"),
+  downloadAndInstall: (downloadUrl) => ipcRenderer.invoke("updater:downloadAndInstall", downloadUrl),
+};
+
 const utilsAPI = {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
 };
@@ -67,3 +86,4 @@ contextBridge.exposeInMainWorld("terminal", terminalAPI);
 contextBridge.exposeInMainWorld("settings", settingsAPI);
 contextBridge.exposeInMainWorld("hivemind", hivemindAPI);
 contextBridge.exposeInMainWorld("electronUtils", utilsAPI);
+contextBridge.exposeInMainWorld("updater", updaterAPI);

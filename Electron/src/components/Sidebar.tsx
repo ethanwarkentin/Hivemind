@@ -2,6 +2,8 @@ import { useState } from "react";
 import { LayoutMode } from "../App";
 import appIcon from "../assets/icon.png";
 
+type UpdateStatus = "idle" | "checking" | "downloading" | "up-to-date" | "available" | "error";
+
 interface Tab {
   id: string;
   title: string;
@@ -58,6 +60,43 @@ export default function Sidebar({
   onThemeChange,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateInfo, setUpdateInfo] = useState<{ latestVersion?: string; downloadUrl?: string; error?: string }>({});
+
+  const handleCheckForUpdates = async () => {
+    setUpdateStatus("checking");
+    try {
+      const result = await window.updater.checkForUpdate();
+      if (result.error) {
+        setUpdateStatus("error");
+        setUpdateInfo({ error: result.error });
+      } else if (result.hasUpdate) {
+        setUpdateStatus("available");
+        setUpdateInfo({ latestVersion: result.latestVersion, downloadUrl: result.downloadUrl });
+      } else {
+        setUpdateStatus("up-to-date");
+        setUpdateInfo({});
+      }
+    } catch {
+      setUpdateStatus("error");
+      setUpdateInfo({ error: "Failed to check for updates" });
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo.downloadUrl) return;
+    setUpdateStatus("downloading");
+    try {
+      const result = await window.updater.downloadAndInstall(updateInfo.downloadUrl);
+      if (!result.success) {
+        setUpdateStatus("error");
+        setUpdateInfo({ error: result.error || "Download failed" });
+      }
+    } catch {
+      setUpdateStatus("error");
+      setUpdateInfo({ error: "Download failed" });
+    }
+  };
 
   if (collapsed) {
     return (
@@ -213,7 +252,39 @@ export default function Sidebar({
                 <span>Paulino Mode</span>
               </label>
               <hr className="settings__divider" />
-              <div className="settings__version">v{__APP_VERSION__}</div>
+              <div className="settings__version-row">
+                <span className="settings__version">v{__APP_VERSION__}</span>
+                {updateStatus === "idle" && (
+                  <button className="settings__update-btn" onClick={handleCheckForUpdates}>
+                    Check for Updates
+                  </button>
+                )}
+                {updateStatus === "checking" && (
+                  <span className="settings__update-status settings__update-status--checking">
+                    Checking...
+                  </span>
+                )}
+                {updateStatus === "up-to-date" && (
+                  <span className="settings__update-status settings__update-status--ok">
+                    Up to date
+                  </span>
+                )}
+                {updateStatus === "available" && (
+                  <button className="settings__update-btn settings__update-btn--download" onClick={handleDownloadUpdate}>
+                    Download v{updateInfo.latestVersion}
+                  </button>
+                )}
+                {updateStatus === "downloading" && (
+                  <span className="settings__update-status settings__update-status--checking">
+                    Downloading...
+                  </span>
+                )}
+                {updateStatus === "error" && (
+                  <span className="settings__update-status settings__update-status--error" title={updateInfo.error}>
+                    Error
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
