@@ -27,11 +27,26 @@ interface HivemindAPI {
   getSession: () => Promise<Array<{ title: string; cwd: string; hadClaude: boolean }>>;
 }
 
+interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  downloadUrl?: string;
+  releaseNotes?: string;
+  error?: string;
+}
+
+interface UpdaterAPI {
+  checkForUpdate: () => Promise<UpdateInfo>;
+  downloadAndInstall: (downloadUrl: string) => Promise<{ success: boolean; error?: string }>;
+}
+
 declare global {
   interface Window {
     terminal: TerminalAPI;
     settings: SettingsAPI;
     hivemind: HivemindAPI;
+    updater: UpdaterAPI;
   }
 }
 
