@@ -119,6 +119,7 @@ export interface FightAPI {
   resume: () => void;
   resolve: (resolution?: string) => void;
   end: () => void;
+  sendPrompt: (id: string, text: string) => void;
   onStateUpdate: (callback: (state: FightState) => void) => void;
   removeAllListeners: () => void;
 }
@@ -131,6 +132,7 @@ const fightAPI: FightAPI = {
   resume: () => ipcRenderer.send("fight:resume"),
   resolve: (resolution) => ipcRenderer.send("fight:resolve", resolution),
   end: () => ipcRenderer.send("fight:end"),
+  sendPrompt: (id, text) => ipcRenderer.send("fight:sendPrompt", { id, text }),
   onStateUpdate: (callback) => {
     ipcRenderer.on("fight:stateUpdate", (_event, state) => callback(state));
   },

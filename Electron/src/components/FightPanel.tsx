@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface FightState {
   status: "active" | "paused" | "resolved";
@@ -9,6 +9,12 @@ interface FightState {
     fighter1: { title: string; terminal_id: string };
     fighter2: { title: string; terminal_id: string };
   };
+  summary: string;
+}
+
+interface LogEntry {
+  round: number;
+  turn: string;
   summary: string;
 }
 
@@ -23,10 +29,27 @@ interface FightPanelProps {
 
 export default function FightPanel({ fight, onPause, onResume, onResolve, onMessage, onEnd }: FightPanelProps) {
   const [input, setInput] = useState("");
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const lastSummaryRef = useRef("");
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  // Append new summaries to the log as they come in
+  useEffect(() => {
+    if (fight.summary && fight.summary !== lastSummaryRef.current) {
+      lastSummaryRef.current = fight.summary;
+      setLog((prev) => [...prev, { round: fight.round, turn: fight.turn, summary: fight.summary }]);
+    }
+  }, [fight.summary, fight.round, fight.turn]);
+
+  // Auto-scroll to bottom of log
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [log]);
 
   const handleSend = () => {
     if (!input.trim()) return;
     onMessage(input.trim());
+    setLog((prev) => [...prev, { round: fight.round, turn: "you", summary: input.trim() }]);
     setInput("");
   };
 
@@ -65,9 +88,20 @@ export default function FightPanel({ fight, onPause, onResume, onResolve, onMess
         </div>
       </div>
 
-      {fight.summary && (
-        <div className="fight-panel__summary">{fight.summary}</div>
-      )}
+      <div className="fight-panel__log">
+        {log.length === 0 && (
+          <div className="fight-panel__log-empty">Waiting for Momma to start the fight...</div>
+        )}
+        {log.map((entry, i) => (
+          <div key={i} className={`fight-panel__log-entry${entry.turn === "you" ? " fight-panel__log-entry--user" : ""}`}>
+            <span className="fight-panel__log-round">
+              {entry.turn === "you" ? "You" : `R${entry.round}`}
+            </span>
+            <span className="fight-panel__log-text">{entry.summary}</span>
+          </div>
+        ))}
+        <div ref={logEndRef} />
+      </div>
 
       <div className="fight-panel__turn">
         {fight.status === "active" && <>Waiting on: <strong>{turnLabel}</strong></>}

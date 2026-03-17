@@ -440,6 +440,17 @@ ipcMain.on("fight:resolve", (_event: IpcMainEvent, resolution?: string) => {
   fightManager.resolveFight(resolution);
 });
 
+ipcMain.on("fight:sendPrompt", (_event: IpcMainEvent, { id, text }: { id: string; text: string }) => {
+  const clean = text.replace(/[\r\n]+/g, " ").trim();
+  const proc = terminals.get(id);
+  if (proc) {
+    proc.write(clean);
+    setTimeout(() => {
+      proc.write("\r");
+    }, 500);
+  }
+});
+
 ipcMain.on("fight:end", () => {
   fightManager.endFight();
 });

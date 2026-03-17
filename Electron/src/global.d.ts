@@ -79,6 +79,7 @@ declare global {
     resume: () => void;
     resolve: (resolution?: string) => void;
     end: () => void;
+    sendPrompt: (id: string, text: string) => void;
     onStateUpdate: (callback: (state: FightState) => void) => void;
     removeAllListeners: () => void;
   }

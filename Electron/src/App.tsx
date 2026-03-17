@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Terminal from "./components/Terminal";
 import Sidebar from "./components/Sidebar";
 import ConfirmModal, { getRandomClaudeMessage } from "./components/ConfirmModal";
@@ -39,6 +39,7 @@ export default function App() {
   const [fightModalOpen, setFightModalOpen] = useState(false);
   const [activeFight, setActiveFight] = useState<FightState | null>(null);
   const [mommaTabId, setMommaTabId] = useState<string | null>(null);
+  const mommaTabIdRef = useRef<string | null>(null);
 
   const claudeStartupMessages = [
     "Waking up your favorite AI child...",
@@ -163,20 +164,15 @@ export default function App() {
       setTabs((prev) => [...prev, mommaTab]);
       setActiveTab(result.mommaTerminal.id);
       setMommaTabId(result.mommaTerminal.id);
+      mommaTabIdRef.current = result.mommaTerminal.id;
       setActiveFight(result.fightState);
 
       // Start Claude in Momma's terminal after a short delay
+      // User will approve the trust prompt manually
+      // onClaudeDetected sends Momma her first instruction once Claude fully starts
       setTimeout(() => {
         window.terminal.write(result.mommaTerminal.id, "claude\r");
       }, 1000);
-
-      // After Claude starts, give Momma her first instruction
-      setTimeout(() => {
-        window.terminal.write(
-          result.mommaTerminal.id,
-          "A fight has been initiated. Read 00_context.md and state.json in this folder. Begin orchestrating by updating state.json with the opening prompt for Fighter 1. Set turn to fighter1, write a clear next_prompt with full file paths, and set prompt_seq to 1.\r"
-        );
-      }, 8000);
     },
     [tabs]
   );
@@ -313,11 +309,19 @@ export default function App() {
     "Claude Norris",
   ];
 
+  const mommaInstructionSent = useRef(false);
+
   const onClaudeDetected = useCallback((id: string, folder: string) => {
+    // Check if this is Momma before entering setTabs
+    const isMommaTerminal = id === mommaTabIdRef.current;
+
+    if (isMommaTerminal && !mommaInstructionSent.current) {
+      mommaInstructionSent.current = true;
+      window.fight.sendPrompt(id, "A fight has been initiated. Read 00_context.md and state.json in this folder. Begin orchestrating by updating state.json with the opening prompt for Fighter 1. Set turn to fighter1, write a clear next_prompt with full file paths, and set prompt_seq to 1.");
+    }
+
     setTabs((prev) => {
-      // Don't rename Momma — she keeps her title
-      const isMomma = prev.find((t) => t.id === id)?.title === "CLAUDE MOMMA";
-      if (isMomma) {
+      if (isMommaTerminal) {
         return prev.map((t) =>
           t.id === id ? { ...t, hadClaude: true } : t
         );
@@ -438,6 +442,8 @@ export default function App() {
                     window.fight.end();
                     setActiveFight(null);
                     setMommaTabId(null);
+                    mommaTabIdRef.current = null;
+                    mommaInstructionSent.current = false;
                   }}
                 />
               </div>

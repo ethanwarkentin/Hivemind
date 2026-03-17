@@ -90,12 +90,18 @@ Fighter 2 argues that the CORS config is correct and the real issue is your toke
 - After 5 rounds with no progress, declare a deadlock and write resolution.md
 - If both fighters converge on the same solution, write resolution.md and set status to "resolved"
 
-## IMPORTANT: Keep Fighters Focused
-Fighters must NOT go on broad codebase research sprees, mass file reads, or sprawling searches. In every next_prompt you write, include this rule:
+## IMPORTANT: Fighter Constraints
+When writing each next_prompt, you must frame the prompt so the fighter naturally follows these constraints. Do NOT paste these rules verbatim — instead, word your prompt in a way that enforces them:
 
-**"Do NOT research the entire codebase or run broad searches. Keep your response focused on the specific issue. If you need more context about a specific file, function, or config — ASK THE USER to point you to it. Write a focused argument based on what you already know. If you're unsure about something, say so and ask the user for guidance rather than exploring on your own."**
+1. **Stay in your lane** — Never ask a fighter to look at, read, or search the other fighter's codebase. If Fighter 1 needs to understand what Fighter 2 is doing, tell Fighter 1 to describe what they need and ask the other fighter to explain it. Example prompt wording: "Explain how your side handles X. If you need to know how the other side does Y, describe what you need from them and they'll respond in the next round."
 
-This is critical. Without this constraint, fighters will burn tokens and time exploring code that isn't relevant to the dispute.
+2. **No code changes** — Fighters must NOT edit, write, or modify any code files. This is a debate — they analyze and propose. The user will review and apply fixes. Word your prompts like: "Analyze the issue and propose a fix, but do not make any code changes."
+
+3. **No broad research** — Fighters should not go on sprawling codebase searches. They should work from what they know. If they need specific context, they should ask the user. Word your prompts like: "Focus on the specific issue. If you need more context about a specific file or config, ask the user to point you to it."
+
+4. **Structured responses** — Ask fighters to write their response as: Problem / Their Argument / Proposed Solution.
+
+These constraints must be woven into the natural language of every next_prompt you write. The fighter should feel like they're getting clear, scoped instructions — not a wall of rules.
 
 ## Resolution
 When writing resolution.md, include:
@@ -231,9 +237,18 @@ Fighter response files follow the pattern:
     }
   }
 
+  /** Write text into a terminal and press Enter after a short delay */
+  private sendPrompt(terminalId: string, text: string): void {
+    const clean = text.replace(/[\r\n]+/g, " ").trim();
+    this.writeToTerminal(terminalId, clean);
+    setTimeout(() => {
+      this.writeToTerminal(terminalId, "\r");
+    }, 500);
+  }
+
   sendToMomma(message: string): void {
     if (!this.activeFight?.momma_terminal_id) return;
-    this.writeToTerminal(this.activeFight.momma_terminal_id, message + "\r");
+    this.sendPrompt(this.activeFight.momma_terminal_id, message);
   }
 
   pauseFight(): void {
@@ -268,7 +283,7 @@ Fighter response files follow the pattern:
       const msg = resolution
         ? `The user has ended the fight. Resolution: ${resolution}. Write a final resolution.md if you haven't already, then set state.json status to "resolved".`
         : `The user has ended the fight. Write a final resolution.md summarizing the outcome, then set state.json status to "resolved".`;
-      this.writeToTerminal(this.activeFight.momma_terminal_id, msg + "\r");
+      this.sendPrompt(this.activeFight.momma_terminal_id, msg);
     }
 
     this.broadcastState();
@@ -304,10 +319,7 @@ Fighter response files follow the pattern:
         this.lastKnownFiles.add(f);
         // Notify Momma about new fighter response
         if (this.activeFight.momma_terminal_id) {
-          this.writeToTerminal(
-            this.activeFight.momma_terminal_id,
-            `New fighter response: ${f} — Read it and update state.json with your next decision.\r`
-          );
+          this.sendPrompt(this.activeFight.momma_terminal_id, `New fighter response: ${f} — Read it and update state.json with your next decision.`);
         }
       }
 
@@ -340,7 +352,7 @@ Fighter response files follow the pattern:
             ? state.fighters.fighter1.terminal_id
             : state.fighters.fighter2.terminal_id;
 
-        this.writeToTerminal(targetId, state.next_prompt + "\r");
+        this.sendPrompt(targetId, state.next_prompt);
       } else if (state.prompt_seq > this.lastPromptSeq) {
         // Seq changed but same prompt — just update seq tracking without relaying
         this.lastPromptSeq = state.prompt_seq;

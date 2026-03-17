@@ -145,7 +145,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
           //   Claude Code v2.1.74
           //   Opus 4.6 · Claude Team
           //   ~\Boswell\Projects\Terradome
-          if (/claude\s*code/i.test(stripped)) {
+          if (/claude\s*code\s*v?\d+\.\d+/i.test(stripped)) {
             // Try multiple path patterns
             const patterns = [
               /~[\\\/][\w.\\\/ -]+/,                    // ~\path or ~/path
