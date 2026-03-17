@@ -45,8 +45,8 @@ declare global {
   interface FightCreateOpts {
     name: string;
     description: string;
-    fighter1: { title: string; terminal_id: string };
-    fighter2: { title: string; terminal_id: string };
+    fighter1: { title: string; terminal_id: string; cwd?: string };
+    fighter2: { title: string; terminal_id: string; cwd?: string };
   }
 
   interface FightState {

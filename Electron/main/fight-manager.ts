@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { app, BrowserWindow } from "electron";
 
 // ── Types ────────────────────────────────────────────────
@@ -26,8 +27,8 @@ export interface FightState {
 export interface FightCreateOpts {
   name: string;
   description: string;
-  fighter1: { title: string; terminal_id: string };
-  fighter2: { title: string; terminal_id: string };
+  fighter1: { title: string; terminal_id: string; cwd?: string };
+  fighter2: { title: string; terminal_id: string; cwd?: string };
 }
 
 // ── Momma's CLAUDE.md Template ───────────────────────────
@@ -203,8 +204,11 @@ Fighter response files follow the pattern:
     // Write state.json
     fs.writeFileSync(path.join(fightPath, "state.json"), JSON.stringify(state, null, 2));
 
+    // Set up Claude Code permissions for fight folder access
+    this.setupFightPermissions(fightPath, opts);
+
     this.activeFight = state;
-    this.lastKnownFiles = new Set(["CLAUDE.md", "00_context.md", "state.json"]);
+    this.lastKnownFiles = new Set(["CLAUDE.md", "00_context.md", "state.json", ".claude"]);
     this.lastPromptSeq = 0;
 
     return { fightPath, state };
@@ -295,6 +299,66 @@ Fighter response files follow the pattern:
     this.lastKnownFiles.clear();
     this.lastPromptSeq = 0;
     this.lastRelayedPrompt = "";
+  }
+
+  /** Add fight folder permissions to user's global ~/.claude/settings.json */
+  private setupFightPermissions(fightPath: string, _opts: FightCreateOpts): void {
+    // Momma gets full permissions in her fight folder
+    const mommaClaudeDir = path.join(fightPath, ".claude");
+    fs.mkdirSync(mommaClaudeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(mommaClaudeDir, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: [
+            "Read",
+            "Edit",
+            "Write",
+            "Bash"
+          ]
+        }
+      }, null, 2)
+    );
+
+    // Add fights folder permissions to global Claude settings
+    // Use wildcard pattern like hivemind*fights to handle both dev and prod paths
+    const globalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+    const userDataBase = app.getPath("appData").replace(/\\/g, "/");
+    const fightsPattern = `${userDataBase}/hivemind*fights`;
+    const fightPermissions = [
+      `Read(file_path=${fightsPattern}/*)`,
+      `Write(file_path=${fightsPattern}/*)`,
+      `Edit(file_path=${fightsPattern}/*)`,
+      `Read(file_path=${fightsPattern}/**)`,
+      `Write(file_path=${fightsPattern}/**)`,
+      `Edit(file_path=${fightsPattern}/**)`,
+    ];
+
+    try {
+      let settings: { permissions?: { allow?: string[] } } = {};
+
+      if (fs.existsSync(globalSettingsPath)) {
+        settings = JSON.parse(fs.readFileSync(globalSettingsPath, "utf-8"));
+      }
+
+      if (!settings.permissions) settings.permissions = {};
+      if (!settings.permissions.allow) settings.permissions.allow = [];
+
+      // Add fight permissions if not already present
+      let changed = false;
+      for (const perm of fightPermissions) {
+        if (!settings.permissions.allow.includes(perm)) {
+          settings.permissions.allow.push(perm);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        fs.writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2));
+      }
+    } catch {
+      // If we can't write global settings, fighters will get prompted
+    }
   }
 
   private poll(): void {

@@ -151,8 +151,8 @@ export default function App() {
       const result = await window.fight.create({
         name,
         description,
-        fighter1: { title: fighter1Tab.title, terminal_id: fighter1Id },
-        fighter2: { title: fighter2Tab.title, terminal_id: fighter2Id },
+        fighter1: { title: fighter1Tab.title, terminal_id: fighter1Id, cwd: fighter1Tab.cwd },
+        fighter2: { title: fighter2Tab.title, terminal_id: fighter2Id, cwd: fighter2Tab.cwd },
       });
 
       // Add Momma's terminal as a tab
