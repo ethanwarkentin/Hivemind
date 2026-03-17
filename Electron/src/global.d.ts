@@ -58,8 +58,8 @@ declare global {
     round: number;
     turn: "fighter1" | "fighter2" | "momma";
     fighters: {
-      fighter1: { title: string; terminal_id: string };
-      fighter2: { title: string; terminal_id: string };
+      fighter1: { title: string; terminal_id: string; cwd?: string };
+      fighter2: { title: string; terminal_id: string; cwd?: string };
     };
     momma_terminal_id: string;
     last_file: string;

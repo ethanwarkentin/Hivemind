@@ -254,7 +254,9 @@ export default function App() {
     (id: string) => {
       // Use the hadClaude flag tracked from terminal output detection
       const tab = tabs.find((t) => t.id === id);
-      if (tab?.hadClaude) {
+      if (id === mommaTabIdRef.current) {
+        doKill([id]);
+      } else if (tab?.hadClaude) {
         setPendingClose({ ids: [id], message: getRandomClaudeMessage() });
       } else {
         doKill([id]);
@@ -440,6 +442,9 @@ export default function App() {
                   onMessage={(msg) => window.fight.message(msg)}
                   onEnd={() => {
                     window.fight.end();
+                    if (mommaTabIdRef.current) {
+                      doKill([mommaTabIdRef.current]);
+                    }
                     setActiveFight(null);
                     setMommaTabId(null);
                     mommaTabIdRef.current = null;

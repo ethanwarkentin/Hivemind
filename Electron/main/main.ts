@@ -360,6 +360,7 @@ const fightManager = new FightManager((id: string, data: string) => {
   if (proc) proc.write(data);
 });
 
+
 ipcMain.handle(
   "fight:create",
   async (

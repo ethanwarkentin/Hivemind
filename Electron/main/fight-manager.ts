@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import { app, BrowserWindow } from "electron";
 
 // ── Types ────────────────────────────────────────────────
@@ -14,8 +13,8 @@ export interface FightState {
   round: number;
   turn: "fighter1" | "fighter2" | "momma";
   fighters: {
-    fighter1: { title: string; terminal_id: string };
-    fighter2: { title: string; terminal_id: string };
+    fighter1: { title: string; terminal_id: string; cwd?: string };
+    fighter2: { title: string; terminal_id: string; cwd?: string };
   };
   momma_terminal_id: string;
   last_file: string;
@@ -91,18 +90,13 @@ Fighter 2 argues that the CORS config is correct and the real issue is your toke
 - After 5 rounds with no progress, declare a deadlock and write resolution.md
 - If both fighters converge on the same solution, write resolution.md and set status to "resolved"
 
-## IMPORTANT: Fighter Constraints
-When writing each next_prompt, you must frame the prompt so the fighter naturally follows these constraints. Do NOT paste these rules verbatim — instead, word your prompt in a way that enforces them:
+## CRITICAL: Every next_prompt MUST start with these exact lines
 
-1. **Stay in your lane** — Never ask a fighter to look at, read, or search the other fighter's codebase. If Fighter 1 needs to understand what Fighter 2 is doing, tell Fighter 1 to describe what they need and ask the other fighter to explain it. Example prompt wording: "Explain how your side handles X. If you need to know how the other side does Y, describe what you need from them and they'll respond in the next round."
+Every single next_prompt you write MUST begin with this block before any other content:
 
-2. **No code changes** — Fighters must NOT edit, write, or modify any code files. This is a debate — they analyze and propose. The user will review and apply fixes. Word your prompts like: "Analyze the issue and propose a fix, but do not make any code changes."
+RULES: Do NOT read, search, or access any code outside your own project. Do NOT look at the other fighter's codebase. If you need to understand what they are doing, say what you need and they will explain in the next round. Do NOT modify, edit, or write any code files in your project — only analyze and propose solutions. Do NOT run broad codebase searches. Work from what you know. If you need context, ask the user. Write your response as: Problem / Your Argument / Proposed Solution.
 
-3. **No broad research** — Fighters should not go on sprawling codebase searches. They should work from what they know. If they need specific context, they should ask the user. Word your prompts like: "Focus on the specific issue. If you need more context about a specific file or config, ask the user to point you to it."
-
-4. **Structured responses** — Ask fighters to write their response as: Problem / Their Argument / Proposed Solution.
-
-These constraints must be woven into the natural language of every next_prompt you write. The fighter should feel like they're getting clear, scoped instructions — not a wall of rules.
+After that block, write the actual fight context and instructions. This is non-negotiable — if a fighter goes outside their repo or edits code, it derails the entire fight.
 
 ## Resolution
 When writing resolution.md, include:
@@ -204,9 +198,6 @@ Fighter response files follow the pattern:
     // Write state.json
     fs.writeFileSync(path.join(fightPath, "state.json"), JSON.stringify(state, null, 2));
 
-    // Set up Claude Code permissions for fight folder access
-    this.setupFightPermissions(fightPath, opts);
-
     this.activeFight = state;
     this.lastKnownFiles = new Set(["CLAUDE.md", "00_context.md", "state.json", ".claude"]);
     this.lastPromptSeq = 0;
@@ -299,66 +290,6 @@ Fighter response files follow the pattern:
     this.lastKnownFiles.clear();
     this.lastPromptSeq = 0;
     this.lastRelayedPrompt = "";
-  }
-
-  /** Add fight folder permissions to user's global ~/.claude/settings.json */
-  private setupFightPermissions(fightPath: string, _opts: FightCreateOpts): void {
-    // Momma gets full permissions in her fight folder
-    const mommaClaudeDir = path.join(fightPath, ".claude");
-    fs.mkdirSync(mommaClaudeDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(mommaClaudeDir, "settings.json"),
-      JSON.stringify({
-        permissions: {
-          allow: [
-            "Read",
-            "Edit",
-            "Write",
-            "Bash"
-          ]
-        }
-      }, null, 2)
-    );
-
-    // Add fights folder permissions to global Claude settings
-    // Use wildcard pattern like hivemind*fights to handle both dev and prod paths
-    const globalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
-    const userDataBase = app.getPath("appData").replace(/\\/g, "/");
-    const fightsPattern = `${userDataBase}/hivemind*fights`;
-    const fightPermissions = [
-      `Read(file_path=${fightsPattern}/*)`,
-      `Write(file_path=${fightsPattern}/*)`,
-      `Edit(file_path=${fightsPattern}/*)`,
-      `Read(file_path=${fightsPattern}/**)`,
-      `Write(file_path=${fightsPattern}/**)`,
-      `Edit(file_path=${fightsPattern}/**)`,
-    ];
-
-    try {
-      let settings: { permissions?: { allow?: string[] } } = {};
-
-      if (fs.existsSync(globalSettingsPath)) {
-        settings = JSON.parse(fs.readFileSync(globalSettingsPath, "utf-8"));
-      }
-
-      if (!settings.permissions) settings.permissions = {};
-      if (!settings.permissions.allow) settings.permissions.allow = [];
-
-      // Add fight permissions if not already present
-      let changed = false;
-      for (const perm of fightPermissions) {
-        if (!settings.permissions.allow.includes(perm)) {
-          settings.permissions.allow.push(perm);
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        fs.writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2));
-      }
-    } catch {
-      // If we can't write global settings, fighters will get prompted
-    }
   }
 
   private poll(): void {
