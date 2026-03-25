@@ -28,6 +28,8 @@ interface SidebarProps {
   onRestoreSessionChange: (enabled: boolean) => void;
   theme: string;
   onThemeChange: (theme: string) => void;
+  useClaudePersonas: boolean;
+  onUseClaudePersonasChange: (enabled: boolean) => void;
   onStartFight: () => void;
   hasFight: boolean;
   mommaTabId: string | null;
@@ -61,6 +63,8 @@ export default function Sidebar({
   onRestoreSessionChange,
   theme,
   onThemeChange,
+  useClaudePersonas,
+  onUseClaudePersonasChange,
   onStartFight,
   hasFight,
   mommaTabId,
@@ -261,6 +265,14 @@ export default function Sidebar({
                   onChange={(e) => onRestoreSessionChange(e.target.checked)}
                 />
                 <span>Restore previous session on startup</span>
+              </label>
+              <label className="settings__checkbox">
+                <input
+                  type="checkbox"
+                  checked={useClaudePersonas}
+                  onChange={(e) => onUseClaudePersonasChange(e.target.checked)}
+                />
+                <span>Use Claude Personalities</span>
               </label>
               <hr className="settings__divider" />
               <label className="settings__checkbox settings__checkbox--paulino">
