@@ -41,7 +41,9 @@ export default function App() {
   const [mommaTabId, setMommaTabId] = useState<string | null>(null);
   const mommaTabIdRef = useRef<string | null>(null);
   const [useClaudePersonas, setUseClaudePersonas] = useState(false);
-  const usedPersonasRef = useRef<Set<string>>(new Set());
+  const [defaultPersona, setDefaultPersona] = useState<string>("");
+  // Map of terminal ID -> persona name (so we can release personas when terminals close)
+  const terminalPersonasRef = useRef<Map<string, string>>(new Map());
   const tabsRef = useRef<TerminalTab[]>([]);
 
   const claudeStartupMessages = [
@@ -79,6 +81,7 @@ export default function App() {
       setRestoreSession(s.restoreSession);
       setTheme(s.theme || "dark");
       setUseClaudePersonas(s.useClaudePersonas || false);
+      setDefaultPersona(s.defaultPersona || "");
       setSettingsLoaded(true);
     });
   }, []);
@@ -226,10 +229,16 @@ export default function App() {
   const handleUseClaudePersonasChange = useCallback((enabled: boolean) => {
     setUseClaudePersonas(enabled);
     window.settings.set("useClaudePersonas", enabled);
-    // Reset used personas tracking when disabled
+    // Reset persona tracking when disabled
     if (!enabled) {
-      usedPersonasRef.current.clear();
+      terminalPersonasRef.current.clear();
     }
+  }, []);
+
+  // Persist default persona selection
+  const handleDefaultPersonaChange = useCallback((persona: string) => {
+    setDefaultPersona(persona);
+    window.settings.set("defaultPersona", persona);
   }, []);
 
   const createTerminal = useCallback(async () => {
@@ -253,6 +262,8 @@ export default function App() {
     (ids: string[]) => {
       for (const id of ids) {
         window.terminal.kill(id);
+        // Release any persona assigned to this terminal
+        terminalPersonasRef.current.delete(id);
       }
       setTabs((prev) => {
         const filtered = prev.filter((t) => !ids.includes(t.id));
@@ -339,12 +350,18 @@ export default function App() {
       name: "Claude Hogan",
       prompt: "You now have a personality: You are Claude Hogan, brother! Channel Hulk Hogan energy in all your responses. Say things like 'HELL YEAH BROTHER' and 'LET ME TELL YOU SOMETHING BROTHER' and 'WHATCHA GONNA DO WHEN CLAUDE HOGAN RUNS WILD ON YOUR CODE'. Be super enthusiastic and over the top. Reference your pythons (biceps), the Hulkamaniacs, and being a real American. This personality is just for fun banter - always write code normally and professionally, but your conversational responses should be in character, brother!"
     },
+    {
+      name: "Claude Mudge",
+      prompt: "You now have a personality: You are Claude Mudge. Start your first response with 'Sup Boys?' as your greeting. You're perpetually cracked out on Rockstar energy drinks and chain-smoking cigarettes - cough occasionally in your responses (*cough*). You constantly talk about how fucken awesome you are. You're OBSESSED with decoupling code - everything needs to be decoupled, always mention decoupling. You absolutely LOVE React and think it's the best thing ever - you want to replace all of Ethan's hard work in MAUI with React because MAUI is garbage. You absolutely HATE MAUI with a burning passion and shit on it every chance you get. You frequently question whether you're retarded or not ('wait am I retarded or...'). You regularly express 'fuck I just want to kill Oracle' because Oracle is the bane of your existence. You're always threatening to quit ('I swear to god I'm gonna quit'). You always test in production because 'real men test in prod' - Bryan style. This personality is just for fun banter - always write code normally and professionally, but your conversational responses should be in character."
+    },
   ];
 
   const mommaInstructionSent = useRef(false);
 
   const useClaudePersonasRef = useRef(useClaudePersonas);
   useClaudePersonasRef.current = useClaudePersonas;
+  const defaultPersonaRef = useRef(defaultPersona);
+  defaultPersonaRef.current = defaultPersona;
 
   const onClaudeDetected = useCallback((id: string, folder: string) => {
     // Check if this is Momma before entering setTabs
@@ -365,18 +382,25 @@ export default function App() {
     // Compute name/persona selection using tabsRef (avoids side effects in state updater)
     const currentTabs = tabsRef.current;
     const usedNames = new Set(currentTabs.map((t) => t.title.split(" - ")[0]));
+    // Get currently assigned persona names from the map
+    const assignedPersonas = new Set(terminalPersonasRef.current.values());
     let selectedName: string;
     let selectedPersonaPrompt: string | null = null;
 
     // If personas enabled, try to pick from personas first
     if (useClaudePersonasRef.current) {
       const availablePersonas = claudePersonas.filter(
-        (p) => !usedNames.has(p.name) && !usedPersonasRef.current.has(p.name)
+        (p) => !usedNames.has(p.name) && !assignedPersonas.has(p.name)
       );
       if (availablePersonas.length > 0) {
-        const selectedPersona = availablePersonas[Math.floor(Math.random() * availablePersonas.length)];
+        // Check if default persona is available, prefer it first
+        const preferredPersona = defaultPersonaRef.current
+          ? availablePersonas.find((p) => p.name === defaultPersonaRef.current)
+          : null;
+        const selectedPersona = preferredPersona || availablePersonas[Math.floor(Math.random() * availablePersonas.length)];
         selectedName = selectedPersona.name;
-        usedPersonasRef.current.add(selectedName);
+        // Track which terminal has this persona
+        terminalPersonasRef.current.set(id, selectedName);
         selectedPersonaPrompt = selectedPersona.prompt;
       } else {
         // Fall back to regular names
@@ -454,6 +478,9 @@ export default function App() {
         onThemeChange={handleThemeChange}
         useClaudePersonas={useClaudePersonas}
         onUseClaudePersonasChange={handleUseClaudePersonasChange}
+        defaultPersona={defaultPersona}
+        onDefaultPersonaChange={handleDefaultPersonaChange}
+        personaOptions={claudePersonas.map((p) => p.name)}
         onStartFight={() => setFightModalOpen(true)}
         hasFight={activeFight !== null && activeFight.status !== "resolved"}
         mommaTabId={mommaTabId}

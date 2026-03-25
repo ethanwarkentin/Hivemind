@@ -18,7 +18,7 @@ declare global {
   }
 
   interface SettingsAPI {
-    get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean }>;
+    get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean; defaultPersona: string }>;
     set: (key: string, value: unknown) => void;
     browseFolder: () => Promise<string | null>;
   }

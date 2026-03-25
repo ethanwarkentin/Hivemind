@@ -30,6 +30,9 @@ interface SidebarProps {
   onThemeChange: (theme: string) => void;
   useClaudePersonas: boolean;
   onUseClaudePersonasChange: (enabled: boolean) => void;
+  defaultPersona: string;
+  onDefaultPersonaChange: (persona: string) => void;
+  personaOptions: string[];
   onStartFight: () => void;
   hasFight: boolean;
   mommaTabId: string | null;
@@ -65,6 +68,9 @@ export default function Sidebar({
   onThemeChange,
   useClaudePersonas,
   onUseClaudePersonasChange,
+  defaultPersona,
+  onDefaultPersonaChange,
+  personaOptions,
   onStartFight,
   hasFight,
   mommaTabId,
@@ -274,6 +280,23 @@ export default function Sidebar({
                 />
                 <span>Use Claude Personalities</span>
               </label>
+              {useClaudePersonas && (
+                <div className="settings__field">
+                  <label className="settings__label">Default Persona</label>
+                  <select
+                    className="sidebar__layout-select"
+                    value={defaultPersona}
+                    onChange={(e) => onDefaultPersonaChange(e.target.value)}
+                  >
+                    <option value="">No preference (random)</option>
+                    {personaOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <hr className="settings__divider" />
               <label className="settings__checkbox settings__checkbox--paulino">
                 <input

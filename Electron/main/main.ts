@@ -119,6 +119,7 @@ ipcMain.handle("settings:get", () => {
     restoreSession: store.get("restoreSession"),
     theme: store.get("theme"),
     useClaudePersonas: store.get("useClaudePersonas"),
+    defaultPersona: store.get("defaultPersona"),
   };
 });
 
