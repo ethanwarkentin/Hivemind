@@ -118,6 +118,8 @@ ipcMain.handle("settings:get", () => {
     fontSize: store.get("fontSize"),
     restoreSession: store.get("restoreSession"),
     theme: store.get("theme"),
+    useClaudePersonas: store.get("useClaudePersonas"),
+    defaultPersona: store.get("defaultPersona"),
   };
 });
 

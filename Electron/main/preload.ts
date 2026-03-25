@@ -19,7 +19,7 @@ export interface TerminalAPI {
 }
 
 export interface SettingsAPI {
-  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string }>;
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean; defaultPersona: string }>;
   set: (key: string, value: unknown) => void;
   browseFolder: () => Promise<string | null>;
 }
