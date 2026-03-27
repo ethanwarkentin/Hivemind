@@ -83,6 +83,40 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
       }
     });
 
+    // Keyboard shortcuts: Ctrl+C (copy when selection exists), Ctrl+V (paste)
+    xterm.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+      // Only handle keydown events
+      if (e.type !== "keydown") return true;
+
+      // Ctrl+C: copy if there's a selection, otherwise let it send SIGINT
+      if (e.ctrlKey && e.key === "c") {
+        const selection = xterm.getSelection() || lastSelectionRef.current;
+        if (selection) {
+          e.preventDefault(); // Stop browser's native copy
+          navigator.clipboard.writeText(selection);
+          xterm.clearSelection();
+          lastSelectionRef.current = "";
+          return false; // Prevent xterm's default handling (don't send SIGINT)
+        }
+        return true; // No selection, let Ctrl+C send SIGINT as normal
+      }
+
+      // Ctrl+V: paste from clipboard
+      if (e.ctrlKey && e.key === "v") {
+        e.preventDefault(); // Stop browser's native paste
+        navigator.clipboard.readText().then((text) => {
+          if (text && active) {
+            window.terminal.write(id, text);
+          }
+        }).catch(() => {
+          // Clipboard access denied or empty
+        });
+        return false; // Prevent xterm's default handling
+      }
+
+      return true; // Allow all other keys
+    });
+
     // Send user keystrokes to the PTY
     xterm.onData((data: string) => {
       window.terminal.write(id, data);
