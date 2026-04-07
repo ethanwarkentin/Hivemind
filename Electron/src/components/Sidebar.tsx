@@ -18,6 +18,7 @@ interface SidebarProps {
   fontSize: number;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
+  onRenameTab: (id: string, newTitle: string) => void;
   onCloseAll: () => void;
   onNew: () => void;
   onLayoutChange: (layout: LayoutMode) => void;
@@ -56,6 +57,7 @@ export default function Sidebar({
   fontSize,
   onSelect,
   onClose,
+  onRenameTab,
   onCloseAll,
   onNew,
   onLayoutChange,
@@ -76,6 +78,8 @@ export default function Sidebar({
   mommaTabId,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [updateInfo, setUpdateInfo] = useState<{ latestVersion?: string; downloadUrl?: string; error?: string }>({});
 
@@ -174,7 +178,39 @@ export default function Sidebar({
             title={tab.title}
           >
             <span className={`sidebar__index${tab.id === mommaTabId ? " sidebar__index--momma" : ""}`}>{tab.id === mommaTabId ? "M" : index + 1}</span>
-            <span className={`sidebar__item-title${tab.id === mommaTabId ? " sidebar__item-title--momma" : ""}`}>{tab.title}</span>
+            {editingTabId === tab.id ? (
+              <input
+                className="sidebar__item-rename"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={() => {
+                  if (editingTitle.trim()) onRenameTab(tab.id, editingTitle.trim());
+                  setEditingTabId(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (editingTitle.trim()) onRenameTab(tab.id, editingTitle.trim());
+                    setEditingTabId(null);
+                  } else if (e.key === "Escape") {
+                    setEditingTabId(null);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+                spellCheck={false}
+              />
+            ) : (
+              <span
+                className={`sidebar__item-title${tab.id === mommaTabId ? " sidebar__item-title--momma" : ""}`}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEditingTabId(tab.id);
+                  setEditingTitle(tab.title);
+                }}
+              >
+                {tab.title}
+              </span>
+            )}
             <button
               className="sidebar__close"
               onClick={(e) => {

@@ -11,6 +11,7 @@ export type LayoutMode = "auto" | "single" | "columns" | "rows" | "grid-2x2" | "
 interface TerminalTab {
   id: string;
   title: string;
+  customTitle?: boolean;
   cwd?: string;
   hadClaude?: boolean;
 }
@@ -295,6 +296,10 @@ export default function App() {
     [tabs, doKill]
   );
 
+  const renameTab = useCallback((id: string, newTitle: string) => {
+    setTabs((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, customTitle: true } : t));
+  }, []);
+
   const closeAllTerminals = useCallback(() => {
     // Count terminals that have had Claude running
     const claudeTabs = tabs.filter((t) => t.hadClaude);
@@ -415,9 +420,9 @@ export default function App() {
       selectedName = pool[Math.floor(Math.random() * pool.length)];
     }
 
-    // Update tabs with the selected name
+    // Update tabs with the selected name (but respect user-set custom titles)
     setTabs((prev) => prev.map((t) =>
-      t.id === id ? { ...t, title: `${selectedName} - ${folder}`, hadClaude: true } : t
+      t.id === id ? { ...t, title: t.customTitle ? t.title : `${selectedName} - ${folder}`, hadClaude: true } : t
     ));
 
     // Send persona prompt if one was selected
@@ -466,6 +471,7 @@ export default function App() {
         fontSize={fontSize}
         onSelect={handleSidebarSelect}
         onClose={closeTerminal}
+        onRenameTab={renameTab}
         onCloseAll={closeAllTerminals}
         onNew={createTerminal}
         onLayoutChange={handleLayoutChange}
