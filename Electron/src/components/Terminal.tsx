@@ -200,6 +200,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
             }
           }
         }
+
       }
     };
     window.terminal.onData(handleData);

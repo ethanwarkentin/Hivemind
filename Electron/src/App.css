@@ -313,6 +313,73 @@
   border-color: var(--accent);
 }
 
+/* ── Hivemind Toggle (Sidebar Header) ────────────────── */
+.sidebar__hivemind-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 16px);
+  margin: 8px auto 0;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.sidebar__hivemind-toggle:hover {
+  border-color: var(--accent-dim);
+  color: var(--text-primary);
+  background: var(--sidebar-active);
+}
+
+.sidebar__hivemind-toggle--active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05));
+  color: var(--accent);
+}
+
+.sidebar__hivemind-toggle--active:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+}
+
+.sidebar__hivemind-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sidebar__hivemind-label {
+  flex: 1;
+  text-align: left;
+}
+
+.sidebar__hivemind-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+  transition: all 0.2s ease;
+}
+
+.sidebar__hivemind-dot--on {
+  background: #4ade80;
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+  animation: hivemind-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hivemind-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(74, 222, 128, 0.5); }
+  50% { box-shadow: 0 0 12px rgba(74, 222, 128, 0.8); }
+}
+
 .sidebar__list {
   flex: 1;
   overflow-y: auto;
@@ -364,6 +431,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar__item-rename {
+  flex: 1;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  min-width: 0;
 }
 
 .sidebar__close {
@@ -986,6 +1066,16 @@
   filter: brightness(1.1);
 }
 
+.settings__update-btn--danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.settings__update-btn--danger:hover {
+  filter: brightness(1.1);
+}
+
 .settings__update-status {
   font-size: 12px;
   font-weight: 500;
@@ -1003,6 +1093,56 @@
 .settings__update-status--error {
   color: #f87171;
   cursor: help;
+}
+
+/* ── Hivemind Mode Toggle ────────────────────────────── */
+.settings__hivemind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings__hivemind-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--sidebar-active);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings__hivemind-btn:hover {
+  background: var(--accent);
+  color: var(--bg-dark);
+  border-color: var(--accent);
+}
+
+.settings__hivemind-btn--active {
+  background: var(--accent);
+  color: var(--bg-dark);
+  border-color: var(--accent);
+}
+
+.settings__hivemind-btn--active:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.settings__hivemind-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4ade80;
+}
+
+.settings__hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 /* ── Fight Button (Sidebar) ────────────────────────────── */

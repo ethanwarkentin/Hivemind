@@ -45,6 +45,9 @@ const store = new Store({
     restoreSession: true,
     theme: "dark",
     session: [],
+    useClaudePersonas: false,
+    defaultPersona: "",
+    hivemindEnabled: false,
   },
 });
 
@@ -120,6 +123,7 @@ ipcMain.handle("settings:get", () => {
     theme: store.get("theme"),
     useClaudePersonas: store.get("useClaudePersonas"),
     defaultPersona: store.get("defaultPersona"),
+    hivemindEnabled: store.get("hivemindEnabled"),
   };
 });
 
@@ -456,6 +460,238 @@ ipcMain.on("fight:sendPrompt", (_event: IpcMainEvent, { id, text }: { id: string
 
 ipcMain.on("fight:end", () => {
   fightManager.endFight();
+});
+
+// ── Handoff System (file-based cross-terminal messaging) ─────
+
+const handoffDir = path.join(app.getPath("userData"), "handoffs");
+if (!fs.existsSync(handoffDir)) {
+  fs.mkdirSync(handoffDir, { recursive: true });
+}
+
+// Track terminal names so we can resolve handoff targets
+const terminalNames = new Map<string, string>(); // id → title
+const terminalsJsonPath = path.join(app.getPath("userData"), "terminals.json");
+
+ipcMain.on("handoff:registerTerminals", (_event: IpcMainEvent, tabList: { id: string; title: string }[]) => {
+  terminalNames.clear();
+  for (const t of tabList) {
+    terminalNames.set(t.id, t.title);
+  }
+  // Write terminals.json so Claude instances can read the current list
+  if (store.get("hivemindEnabled")) {
+    try {
+      fs.writeFileSync(terminalsJsonPath, JSON.stringify(tabList, null, 2));
+    } catch { /* ignore */ }
+  }
+});
+
+function resolveHandoffTarget(targetName: string): string | null {
+  const lower = targetName.toLowerCase();
+  // Exact match first
+  for (const [id, title] of terminalNames) {
+    if (title.toLowerCase() === lower) return id;
+  }
+  // Partial match (target name contained in title)
+  for (const [id, title] of terminalNames) {
+    if (title.toLowerCase().includes(lower)) return id;
+  }
+  return null;
+}
+
+function sendPromptToTerminal(terminalId: string, text: string): void {
+  const clean = text.replace(/[\r\n]+/g, " ").trim();
+  const proc = terminals.get(terminalId);
+  if (proc) {
+    proc.write(clean);
+    setTimeout(() => proc.write("\r"), 500);
+  }
+}
+
+// Poll for handoff files every 2 seconds
+setInterval(() => {
+  try {
+    const files = fs.readdirSync(handoffDir).filter((f) => f.endsWith(".json"));
+    for (const file of files) {
+      const filePath = path.join(handoffDir, file);
+      try {
+        const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        const { target, message } = content;
+        if (target && message) {
+          const targetId = resolveHandoffTarget(target);
+          if (targetId) {
+            console.log(`[Hivemind Handoff] "${target}" → terminal ${targetId}`);
+            sendPromptToTerminal(targetId, message);
+          } else {
+            console.warn(`[Hivemind Handoff] No terminal matching "${target}"`);
+          }
+        }
+        fs.unlinkSync(filePath);
+      } catch {
+        // Bad file, delete it
+        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+      }
+    }
+  } catch {
+    // handoff dir read failed
+  }
+}, 2000);
+
+// Expose handoff dir path to renderer
+ipcMain.handle("handoff:getDir", () => handoffDir);
+
+// ── Hivemind Mode (CLAUDE.md + settings.json management) ─────
+
+const HIVEMIND_SECTION_START = "# Hivemind";
+const HIVEMIND_SECTION_END = "# End Hivemind";
+const claudeDir = path.join(os.homedir(), ".claude");
+const claudeMdPath = path.join(claudeDir, "CLAUDE.md");
+const claudeSettingsPath = path.join(claudeDir, "settings.json");
+
+function getHivemindClaudeMd(): string {
+  const handoffDirPosix = handoffDir.replace(/\\/g, "/");
+  const terminalsJsonPosix = terminalsJsonPath.replace(/\\/g, "/");
+  return `${HIVEMIND_SECTION_START}
+You are running inside **Hivemind**, a multi-terminal manager. Multiple Claude instances may be active simultaneously.
+
+## Messaging other terminals
+When the user asks you to tell, send, or pass something to another terminal:
+1. Read \`${terminalsJsonPosix}\` to see the current list of terminal names
+2. Write a JSON file to \`${handoffDirPosix}/\` (any filename ending in .json) with this format:
+   \`\`\`json
+   {"target": "Full Terminal Name", "message": "your message here"}
+   \`\`\`
+3. The message will be delivered to that terminal as user input automatically.
+
+Only do this when the user explicitly asks you to communicate with another terminal.
+${HIVEMIND_SECTION_END}`;
+}
+
+function addHivemindToClaudeMd(): void {
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+  let content = "";
+  if (fs.existsSync(claudeMdPath)) {
+    content = fs.readFileSync(claudeMdPath, "utf-8");
+    // Remove existing section if present
+    const startIdx = content.indexOf(HIVEMIND_SECTION_START);
+    const endIdx = content.indexOf(HIVEMIND_SECTION_END);
+    if (startIdx !== -1 && endIdx !== -1) {
+      content = content.slice(0, startIdx) + content.slice(endIdx + HIVEMIND_SECTION_END.length);
+      content = content.replace(/\n{3,}/g, "\n\n").trim();
+    }
+  }
+  const section = getHivemindClaudeMd();
+  content = content ? `${content.trim()}\n\n${section}\n` : `${section}\n`;
+  fs.writeFileSync(claudeMdPath, content);
+}
+
+function removeHivemindFromClaudeMd(): void {
+  if (!fs.existsSync(claudeMdPath)) return;
+  let content = fs.readFileSync(claudeMdPath, "utf-8");
+  const startIdx = content.indexOf(HIVEMIND_SECTION_START);
+  const endIdx = content.indexOf(HIVEMIND_SECTION_END);
+  if (startIdx !== -1 && endIdx !== -1) {
+    content = content.slice(0, startIdx) + content.slice(endIdx + HIVEMIND_SECTION_END.length);
+    content = content.replace(/\n{3,}/g, "\n\n").trim();
+    fs.writeFileSync(claudeMdPath, content ? content + "\n" : "");
+  }
+}
+
+function getHandoffAllowedTools(): string[] {
+  const home = os.homedir().replace(/\\/g, "/");
+  const handoffFwd = handoffDir.replace(/\\/g, "/");
+  const terminalsFwd = terminalsJsonPath.replace(/\\/g, "/");
+  // Generate both absolute and tilde-relative paths since Claude Code may resolve either way
+  const handoffTilde = handoffFwd.replace(home, "~");
+  const terminalsTilde = terminalsFwd.replace(home, "~");
+  return [
+    `Read(${terminalsFwd})`,
+    `Read(${terminalsTilde})`,
+    `Read(${handoffFwd}/**)`,
+    `Read(${handoffTilde}/**)`,
+    `Read(${handoffFwd}/*)`,
+    `Read(${handoffTilde}/*)`,
+    `Write(${handoffFwd}/**)`,
+    `Write(${handoffTilde}/**)`,
+    `Write(${handoffFwd}/*)`,
+    `Write(${handoffTilde}/*)`,
+    `Edit(${handoffFwd}/**)`,
+    `Edit(${handoffTilde}/**)`,
+  ];
+}
+
+function addHivemindToClaudeSettings(): void {
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+  let settings: Record<string, unknown> = {};
+  if (fs.existsSync(claudeSettingsPath)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
+    } catch { /* start fresh */ }
+  }
+  // Claude Code uses permissions.allow for auto-approved tools
+  const permissions = (settings.permissions as Record<string, unknown>) || {};
+  const allowed = (permissions.allow as string[]) || [];
+  const hivemindTools = getHandoffAllowedTools();
+  for (const tool of hivemindTools) {
+    if (!allowed.includes(tool)) {
+      allowed.push(tool);
+    }
+  }
+  permissions.allow = allowed;
+  settings.permissions = permissions;
+  // Clean up old allowedTools field if present from previous version
+  delete settings.allowedTools;
+  fs.writeFileSync(claudeSettingsPath, JSON.stringify(settings, null, 2));
+}
+
+function removeHivemindFromClaudeSettings(): void {
+  if (!fs.existsSync(claudeSettingsPath)) return;
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
+  } catch { return; }
+  const permissions = (settings.permissions as Record<string, unknown>) || {};
+  const allowed = (permissions.allow as string[]) || [];
+  const hivemindTools = new Set(getHandoffAllowedTools());
+  permissions.allow = allowed.filter((t: string) => !hivemindTools.has(t));
+  settings.permissions = permissions;
+  // Clean up old allowedTools field if present from previous version
+  delete settings.allowedTools;
+  fs.writeFileSync(claudeSettingsPath, JSON.stringify(settings, null, 2));
+}
+
+ipcMain.handle("hivemind:enable", () => {
+  try {
+    addHivemindToClaudeMd();
+    addHivemindToClaudeSettings();
+    // Write initial terminals.json
+    const tabList: { id: string; title: string }[] = [];
+    for (const [id, title] of terminalNames) {
+      tabList.push({ id, title });
+    }
+    fs.writeFileSync(terminalsJsonPath, JSON.stringify(tabList, null, 2));
+    store.set("hivemindEnabled", true);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("hivemind:disable", () => {
+  try {
+    removeHivemindFromClaudeMd();
+    removeHivemindFromClaudeSettings();
+    // Clean up terminals.json
+    try { fs.unlinkSync(terminalsJsonPath); } catch { /* ignore */ }
+    store.set("hivemindEnabled", false);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
 });
 
 // ── Updater IPC ───────────────────────────────────────────────

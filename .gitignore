@@ -413,6 +413,7 @@ mcp_stdout.txt
 # Local settings files
 **/settings.local.json
 /.claude/CLAUDE.md
+/CLAUDE.md
 
 # Development appsettings with secrets
 **/appsettings.Local.json
