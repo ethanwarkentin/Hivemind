@@ -18,7 +18,7 @@ declare global {
   }
 
   interface SettingsAPI {
-    get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean; defaultPersona: string }>;
+    get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean; defaultPersona: string; hivemindEnabled: boolean }>;
     set: (key: string, value: unknown) => void;
     browseFolder: () => Promise<string | null>;
   }
@@ -84,12 +84,20 @@ declare global {
     removeAllListeners: () => void;
   }
 
+  interface HandoffAPI {
+    getDir: () => Promise<string>;
+    registerTerminals: (tabs: { id: string; title: string }[]) => void;
+    enable: () => Promise<{ success: boolean; error?: string }>;
+    disable: () => Promise<{ success: boolean; error?: string }>;
+  }
+
   interface Window {
     terminal: TerminalAPI;
     settings: SettingsAPI;
     hivemind: HivemindAPI;
     updater: UpdaterAPI;
     fight: FightAPI;
+    handoff: HandoffAPI;
   }
 
   const __APP_VERSION__: string;

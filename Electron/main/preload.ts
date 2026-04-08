@@ -19,7 +19,7 @@ export interface TerminalAPI {
 }
 
 export interface SettingsAPI {
-  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean; defaultPersona: string }>;
+  get: () => Promise<{ layout: string; defaultCwd: string; fontSize: number; restoreSession: boolean; theme: string; useClaudePersonas: boolean; defaultPersona: string; hivemindEnabled: boolean }>;
   set: (key: string, value: unknown) => void;
   browseFolder: () => Promise<string | null>;
 }
@@ -141,9 +141,24 @@ const fightAPI: FightAPI = {
   },
 };
 
+export interface HandoffAPI {
+  getDir: () => Promise<string>;
+  registerTerminals: (tabs: { id: string; title: string }[]) => void;
+  enable: () => Promise<{ success: boolean; error?: string }>;
+  disable: () => Promise<{ success: boolean; error?: string }>;
+}
+
+const handoffAPI: HandoffAPI = {
+  getDir: () => ipcRenderer.invoke("handoff:getDir"),
+  registerTerminals: (tabs) => ipcRenderer.send("handoff:registerTerminals", tabs),
+  enable: () => ipcRenderer.invoke("hivemind:enable"),
+  disable: () => ipcRenderer.invoke("hivemind:disable"),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
 contextBridge.exposeInMainWorld("settings", settingsAPI);
 contextBridge.exposeInMainWorld("hivemind", hivemindAPI);
 contextBridge.exposeInMainWorld("electronUtils", utilsAPI);
 contextBridge.exposeInMainWorld("updater", updaterAPI);
 contextBridge.exposeInMainWorld("fight", fightAPI);
+contextBridge.exposeInMainWorld("handoff", handoffAPI);

@@ -43,6 +43,7 @@ export default function App() {
   const mommaTabIdRef = useRef<string | null>(null);
   const [useClaudePersonas, setUseClaudePersonas] = useState(false);
   const [defaultPersona, setDefaultPersona] = useState<string>("");
+  const [hivemindEnabled, setHivemindEnabled] = useState(false);
   // Map of terminal ID -> persona name (so we can release personas when terminals close)
   const terminalPersonasRef = useRef<Map<string, string>>(new Map());
   const tabsRef = useRef<TerminalTab[]>([]);
@@ -83,6 +84,7 @@ export default function App() {
       setTheme(s.theme || "dark");
       setUseClaudePersonas(s.useClaudePersonas || false);
       setDefaultPersona(s.defaultPersona || "");
+      setHivemindEnabled(s.hivemindEnabled || false);
       setSettingsLoaded(true);
     });
   }, []);
@@ -425,11 +427,11 @@ export default function App() {
       t.id === id ? { ...t, title: t.customTitle ? t.title : `${selectedName} - ${folder}`, hadClaude: true } : t
     ));
 
-    // Send persona prompt if one was selected
+    // Send persona prompt after Claude initializes (handoff instructions are in ~/.claude/CLAUDE.md)
     if (selectedPersonaPrompt) {
       setTimeout(() => {
         window.fight.sendPrompt(id, selectedPersonaPrompt!);
-      }, 1500); // Wait for Claude to fully initialize
+      }, 1500);
     }
 
     // Clear loading state for this terminal
@@ -446,12 +448,15 @@ export default function App() {
     );
   }, []);
 
+
   // Save session whenever tabs change (including empty to clear session)
   // Only save after we've attempted to restore, to avoid wiping stored session on mount
   useEffect(() => {
     if (!sessionRestoreAttempted) return;
     const sessionList = tabs.map((t) => ({ id: t.id, title: t.title, cwd: t.cwd || "", hadClaude: t.hadClaude || false }));
     window.hivemind.saveSession(sessionList);
+    // Keep main process in sync with terminal names for handoff resolution
+    window.handoff.registerTerminals(tabs.map((t) => ({ id: t.id, title: t.title })));
   }, [tabs, sessionRestoreAttempted]);
 
   const visibleTabs = layout === "single"
@@ -490,6 +495,39 @@ export default function App() {
         onStartFight={() => setFightModalOpen(true)}
         hasFight={activeFight !== null && activeFight.status !== "resolved"}
         mommaTabId={mommaTabId}
+        hivemindEnabled={hivemindEnabled}
+        onHivemindToggle={async (enabled) => {
+          const result = enabled
+            ? await window.handoff.enable()
+            : await window.handoff.disable();
+          if (result.success) {
+            setHivemindEnabled(enabled);
+            window.settings.set("hivemindEnabled", enabled);
+            // Restart all active Claude instances so they pick up CLAUDE.md changes
+            const claudeTabs = tabsRef.current.filter((t) => t.hadClaude);
+            for (const tab of claudeTabs) {
+              // Set loading state
+              setLoadingTerminals((prev) => {
+                const next = new Map(prev);
+                next.set(tab.id, "Restarting Claude for Hivemind changes...");
+                return next;
+              });
+              // Send Ctrl+C twice to exit Claude, clear screen, then restart
+              window.terminal.write(tab.id, "\x03");
+              setTimeout(() => window.terminal.write(tab.id, "\x03"), 300);
+              setTimeout(() => window.terminal.write(tab.id, "clear\r"), 1500);
+              setTimeout(() => window.terminal.write(tab.id, "claude\r"), 2500);
+              // Clear loading spinner after Claude has had time to restart
+              setTimeout(() => {
+                setLoadingTerminals((prev) => {
+                  const next = new Map(prev);
+                  next.delete(tab.id);
+                  return next;
+                });
+              }, 5000);
+            }
+          }
+        }}
       />
       <div className="app__main">
         {isDev && (

@@ -37,6 +37,8 @@ interface SidebarProps {
   onStartFight: () => void;
   hasFight: boolean;
   mommaTabId: string | null;
+  hivemindEnabled: boolean;
+  onHivemindToggle: (enabled: boolean) => void;
 }
 
 const layoutOptions: { value: LayoutMode; label: string }[] = [
@@ -76,10 +78,13 @@ export default function Sidebar({
   onStartFight,
   hasFight,
   mommaTabId,
+  hivemindEnabled,
+  onHivemindToggle,
 }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [hivemindConfirmOpen, setHivemindConfirmOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [updateInfo, setUpdateInfo] = useState<{ latestVersion?: string; downloadUrl?: string; error?: string }>({});
 
@@ -169,6 +174,20 @@ export default function Sidebar({
           &#9664;
         </button>
       </div>
+      <button
+        className={`sidebar__hivemind-toggle${hivemindEnabled ? " sidebar__hivemind-toggle--active" : ""}`}
+        onClick={() => {
+          if (hivemindEnabled) {
+            setHivemindConfirmOpen(true);
+          } else {
+            setHivemindConfirmOpen(true);
+          }
+        }}
+      >
+        <span className="sidebar__hivemind-icon">{hivemindEnabled ? "⬡" : "⬢"}</span>
+        <span className="sidebar__hivemind-label">{hivemindEnabled ? "Hivemind Active" : "Enable Hivemind"}</span>
+        <span className={`sidebar__hivemind-dot${hivemindEnabled ? " sidebar__hivemind-dot--on" : ""}`} />
+      </button>
       <div className="sidebar__list">
         {tabs.map((tab, index) => (
           <div
@@ -375,6 +394,61 @@ export default function Sidebar({
                     Error
                   </span>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {hivemindConfirmOpen && (
+        <div className="modal-overlay" onClick={() => setHivemindConfirmOpen(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-modal__header">
+              <h2 className="settings-modal__title">{hivemindEnabled ? "Disable Hivemind Mode" : "Enable Hivemind Mode"}</h2>
+              <button className="settings-modal__close" onClick={() => setHivemindConfirmOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div className="settings-modal__body">
+              {hivemindEnabled ? (
+                <>
+                  <p style={{ marginBottom: 12, lineHeight: 1.5 }}>
+                    This will remove Hivemind configuration from your global Claude settings:
+                  </p>
+                  <ul style={{ marginBottom: 16, paddingLeft: 20, lineHeight: 1.6 }}>
+                    <li>Removes the Hivemind section from <code>~/.claude/CLAUDE.md</code></li>
+                    <li>Removes handoff file permissions from <code>~/.claude/settings.json</code></li>
+                  </ul>
+                  <p style={{ marginBottom: 16, lineHeight: 1.5, fontWeight: 500 }}>
+                    All active Claude instances will be restarted to pick up the changes.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p style={{ marginBottom: 12, lineHeight: 1.5 }}>
+                    This will modify your global Claude configuration to allow Hivemind terminals to communicate with each other:
+                  </p>
+                  <ul style={{ marginBottom: 16, paddingLeft: 20, lineHeight: 1.6 }}>
+                    <li>Adds a Hivemind section to <code>~/.claude/CLAUDE.md</code></li>
+                    <li>Adds file permissions to <code>~/.claude/settings.json</code> so Claude can read/write handoff files without prompting</li>
+                  </ul>
+                  <p style={{ marginBottom: 16, lineHeight: 1.5, fontWeight: 500 }}>
+                    All active Claude instances will be restarted to pick up the changes.
+                  </p>
+                </>
+              )}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button className="settings__update-btn" onClick={() => setHivemindConfirmOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  className={`settings__update-btn ${hivemindEnabled ? "settings__update-btn--danger" : "settings__update-btn--download"}`}
+                  onClick={() => {
+                    setHivemindConfirmOpen(false);
+                    onHivemindToggle(!hivemindEnabled);
+                  }}
+                >
+                  {hivemindEnabled ? "Disable & Restart" : "Enable & Restart"}
+                </button>
               </div>
             </div>
           </div>
