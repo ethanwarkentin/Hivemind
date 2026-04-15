@@ -474,6 +474,9 @@ const terminalNames = new Map<string, string>(); // id → title
 const terminalsJsonPath = path.join(app.getPath("userData"), "terminals.json");
 
 ipcMain.on("handoff:registerTerminals", (_event: IpcMainEvent, tabList: { id: string; title: string }[]) => {
+  // Only update if we actually have terminals — avoid clearing the map during
+  // transient empty states (e.g. before session restore populates tabs)
+  if (tabList.length === 0) return;
   terminalNames.clear();
   for (const t of tabList) {
     terminalNames.set(t.id, t.title);
@@ -668,15 +671,20 @@ ipcMain.handle("hivemind:enable", () => {
   try {
     addHivemindToClaudeMd();
     addHivemindToClaudeSettings();
-    // Write initial terminals.json
+    // Set the flag first so subsequent registerTerminals calls will write the file
+    store.set("hivemindEnabled", true);
+    // Write initial terminals.json from current known terminals
     const tabList: { id: string; title: string }[] = [];
     for (const [id, title] of terminalNames) {
       tabList.push({ id, title });
     }
-    fs.writeFileSync(terminalsJsonPath, JSON.stringify(tabList, null, 2));
-    store.set("hivemindEnabled", true);
-    return { success: true };
+    if (tabList.length > 0) {
+      fs.writeFileSync(terminalsJsonPath, JSON.stringify(tabList, null, 2));
+    }
+    // Return needsSync flag so the renderer knows to re-register terminals
+    return { success: true, needsSync: tabList.length === 0 };
   } catch (err) {
+    store.set("hivemindEnabled", false);
     return { success: false, error: String(err) };
   }
 });

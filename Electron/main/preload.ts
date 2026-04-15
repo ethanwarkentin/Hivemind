@@ -144,7 +144,7 @@ const fightAPI: FightAPI = {
 export interface HandoffAPI {
   getDir: () => Promise<string>;
   registerTerminals: (tabs: { id: string; title: string }[]) => void;
-  enable: () => Promise<{ success: boolean; error?: string }>;
+  enable: () => Promise<{ success: boolean; needsSync?: boolean; error?: string }>;
   disable: () => Promise<{ success: boolean; error?: string }>;
 }
 

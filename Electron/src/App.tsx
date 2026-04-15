@@ -497,11 +497,18 @@ export default function App() {
         mommaTabId={mommaTabId}
         hivemindEnabled={hivemindEnabled}
         onHivemindToggle={async (enabled) => {
-          const result = enabled
-            ? await window.handoff.enable()
-            : await window.handoff.disable();
-          if (result.success) {
-            setHivemindEnabled(enabled);
+          if (enabled) {
+            const result = await window.handoff.enable();
+            if (!result.success) return;
+            // If main process had no terminals cached, re-send current list
+            if (result.needsSync) {
+              window.handoff.registerTerminals(tabsRef.current.map((t) => ({ id: t.id, title: t.title })));
+            }
+          } else {
+            const result = await window.handoff.disable();
+            if (!result.success) return;
+          }
+          setHivemindEnabled(enabled);
             window.settings.set("hivemindEnabled", enabled);
             // Restart all active Claude instances so they pick up CLAUDE.md changes
             const claudeTabs = tabsRef.current.filter((t) => t.hadClaude);
@@ -526,7 +533,6 @@ export default function App() {
                 });
               }, 5000);
             }
-          }
         }}
       />
       <div className="app__main">
