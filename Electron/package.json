@@ -1,6 +1,6 @@
 {
   "name": "hivemind",
-  "version": "1.13.1",
+  "version": "1.13.2",
   "description": "Multi-terminal manager for Claude Code instances",
   "main": "dist-main/main.js",
   "scripts": {

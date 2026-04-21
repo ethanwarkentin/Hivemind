@@ -503,7 +503,10 @@ function resolveHandoffTarget(targetName: string): string | null {
 }
 
 function sendPromptToTerminal(terminalId: string, text: string): void {
-  const clean = text.replace(/[\r\n]+/g, " ").trim();
+  // Strip all C0 control chars + DEL (not just \r\n): prevents embedded
+  // newlines from submitting early, \x03 from SIGINT-ing the receiver,
+  // and escape sequences from doing anything weird.
+  const clean = text.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
   const proc = terminals.get(terminalId);
   if (proc) {
     proc.write(clean);
@@ -565,6 +568,8 @@ When the user asks you to tell, send, or pass something to another terminal:
    {"target": "Full Terminal Name", "message": "your message here"}
    \`\`\`
 3. The message will be delivered to that terminal as user input automatically.
+
+**Keep \`message\` to a single line of plain text.** Newlines and control characters are stripped before delivery, so multi-line content will be mangled. For anything longer than a sentence or two — code snippets, multi-paragraph instructions, formatted data — write the full content to a \`.md\` file in \`${handoffDirPosix}/\` (the poller only reads \`.json\` files, so \`.md\` files are safe there) and send a short pointer message telling the receiver the exact absolute path to read.
 
 Only do this when the user explicitly asks you to communicate with another terminal.
 ${HIVEMIND_SECTION_END}`;
