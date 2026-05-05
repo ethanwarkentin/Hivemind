@@ -91,6 +91,11 @@ declare global {
     disable: () => Promise<{ success: boolean; error?: string }>;
   }
 
+  interface PersonaAPI {
+    set: (cwd: string, name: string, prompt: string) => Promise<{ success: boolean; error?: string }>;
+    clear: (cwd: string) => Promise<{ success: boolean; error?: string }>;
+  }
+
   interface Window {
     terminal: TerminalAPI;
     settings: SettingsAPI;
@@ -98,6 +103,7 @@ declare global {
     updater: UpdaterAPI;
     fight: FightAPI;
     handoff: HandoffAPI;
+    persona: PersonaAPI;
   }
 
   const __APP_VERSION__: string;

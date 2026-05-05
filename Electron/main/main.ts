@@ -707,6 +707,100 @@ ipcMain.handle("hivemind:disable", () => {
   }
 });
 
+// ── Claude Persona (project-local CLAUDE.md section management) ─────────────
+
+const PERSONA_SECTION_START = "# Persona";
+const PERSONA_SECTION_END = "# End Persona";
+
+function getPersonaSection(name: string, prompt: string): string {
+  return `${PERSONA_SECTION_START}
+You have an active personality assigned by Hivemind: **${name}**.
+
+${prompt}
+
+This personality persists across context compactions. Re-adopt it whenever you re-read this file.
+${PERSONA_SECTION_END}`;
+}
+
+function stripPersonaSection(content: string): string {
+  const startIdx = content.indexOf(PERSONA_SECTION_START);
+  const endIdx = content.indexOf(PERSONA_SECTION_END);
+  if (startIdx !== -1 && endIdx !== -1) {
+    content = content.slice(0, startIdx) + content.slice(endIdx + PERSONA_SECTION_END.length);
+    content = content.replace(/\n{3,}/g, "\n\n").trim();
+  }
+  return content;
+}
+
+function expandTilde(p: string): string {
+  if (!p) return p;
+  if (p === "~" || p.startsWith("~/") || p.startsWith("~\\")) {
+    return path.join(os.homedir(), p.slice(1));
+  }
+  return p;
+}
+
+function addPersonaToLocalClaudeMd(cwd: string, name: string, prompt: string): void {
+  cwd = expandTilde(cwd);
+  if (!cwd || !fs.existsSync(cwd)) return;
+  const filePath = path.join(cwd, "CLAUDE.md");
+  let content = "";
+  if (fs.existsSync(filePath)) {
+    content = fs.readFileSync(filePath, "utf-8");
+    content = stripPersonaSection(content);
+  }
+  const section = getPersonaSection(name, prompt);
+  content = content ? `${content.trim()}\n\n${section}\n` : `${section}\n`;
+  fs.writeFileSync(filePath, content);
+}
+
+function removePersonaFromLocalClaudeMd(cwd: string): void {
+  cwd = expandTilde(cwd);
+  if (!cwd) return;
+  const filePath = path.join(cwd, "CLAUDE.md");
+  if (!fs.existsSync(filePath)) return;
+  const original = fs.readFileSync(filePath, "utf-8");
+  const stripped = stripPersonaSection(original);
+  // If nothing changed, no persona section was present
+  if (stripped === original.trim() || stripped === original) return;
+  if (stripped) {
+    fs.writeFileSync(filePath, stripped + "\n");
+  } else {
+    // File only contained our persona section - remove it
+    fs.unlinkSync(filePath);
+  }
+}
+
+// One-time cleanup: previous Hivemind versions wrote the persona section to the
+// global ~/.claude/CLAUDE.md. Wipe any leftover section from there at startup.
+function purgeGlobalPersonaSection(): void {
+  if (!fs.existsSync(claudeMdPath)) return;
+  const original = fs.readFileSync(claudeMdPath, "utf-8");
+  const stripped = stripPersonaSection(original);
+  if (stripped !== original && stripped !== original.trim()) {
+    fs.writeFileSync(claudeMdPath, stripped ? stripped + "\n" : "");
+  }
+}
+purgeGlobalPersonaSection();
+
+ipcMain.handle("persona:set", (_event, args: { cwd: string; name: string; prompt: string }) => {
+  try {
+    addPersonaToLocalClaudeMd(args.cwd, args.name, args.prompt);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("persona:clear", (_event, args: { cwd: string }) => {
+  try {
+    removePersonaFromLocalClaudeMd(args.cwd);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+});
+
 // ── Updater IPC ───────────────────────────────────────────────
 
 const GITHUB_REPO = "ethanwarkentin/Hivemind";

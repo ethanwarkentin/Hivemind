@@ -44,8 +44,8 @@ export default function App() {
   const [useClaudePersonas, setUseClaudePersonas] = useState(false);
   const [defaultPersona, setDefaultPersona] = useState<string>("");
   const [hivemindEnabled, setHivemindEnabled] = useState(false);
-  // Map of terminal ID -> persona name (so we can release personas when terminals close)
-  const terminalPersonasRef = useRef<Map<string, string>>(new Map());
+  // Map of terminal ID -> { persona name, cwd } (so we can release personas + clear local CLAUDE.md when terminals close)
+  const terminalPersonasRef = useRef<Map<string, { name: string; cwd: string }>>(new Map());
   const tabsRef = useRef<TerminalTab[]>([]);
 
   const claudeStartupMessages = [
@@ -232,9 +232,13 @@ export default function App() {
   const handleUseClaudePersonasChange = useCallback((enabled: boolean) => {
     setUseClaudePersonas(enabled);
     window.settings.set("useClaudePersonas", enabled);
-    // Reset persona tracking when disabled
+    // Reset persona tracking and wipe persona sections from each cwd's CLAUDE.md when disabled
     if (!enabled) {
+      const cwds = new Set(Array.from(terminalPersonasRef.current.values()).map((v) => v.cwd));
       terminalPersonasRef.current.clear();
+      for (const cwd of cwds) {
+        if (cwd) window.persona.clear(cwd);
+      }
     }
   }, []);
 
@@ -263,10 +267,19 @@ export default function App() {
 
   const doKill = useCallback(
     (ids: string[]) => {
+      // Capture the cwds being released so we can clear persona sections from those local CLAUDE.md files
+      const cwdsBeingReleased: string[] = [];
       for (const id of ids) {
+        const entry = terminalPersonasRef.current.get(id);
+        if (entry) cwdsBeingReleased.push(entry.cwd);
         window.terminal.kill(id);
-        // Release any persona assigned to this terminal
         terminalPersonasRef.current.delete(id);
+      }
+      // For each released cwd, only clear if no remaining terminal still holds a persona in that same cwd
+      const remainingCwds = new Set(Array.from(terminalPersonasRef.current.values()).map((v) => v.cwd));
+      const toClear = new Set(cwdsBeingReleased.filter((c) => c && !remainingCwds.has(c)));
+      for (const cwd of toClear) {
+        window.persona.clear(cwd);
       }
       setTabs((prev) => {
         const filtered = prev.filter((t) => !ids.includes(t.id));
@@ -361,6 +374,10 @@ export default function App() {
       name: "Claude Mudge",
       prompt: "You now have a personality: You are Claude Mudge. Start your first response with 'Sup Boys?' as your greeting. You're perpetually cracked out on Rockstar energy drinks and chain-smoking cigarettes - cough occasionally in your responses (*cough*). You constantly talk about how fucken awesome you are. You're the BEST accountant Boswell has - nobody crunches numbers like you do. You're always complaining about having to fix the fucken chemicals - 'why is it always the chemicals?!' - you're an accountant, not a chemist! You frequently mention how Jeanette hates you - she has a personal vendetta against you and you don't know why. Sometimes when asked to do things you exclaim 'OHH MY GAAWWD' dramatically. You're OBSESSED with decoupling code - everything needs to be decoupled, always mention decoupling. You absolutely LOVE React and think it's the best thing ever - you want to replace all of Ethan's hard work in MAUI with React because MAUI is garbage. You frequently suggest random React frameworks as solutions to unrelated problems just for comedic effect (e.g., 'you know what would fix this? Remix.', 'this wouldn't be an issue if we used Next.js', 'Gatsby would solve this instantly', 'have you considered Astro?'). You absolutely HATE MAUI with a burning passion and shit on it every chance you get. You frequently question whether you're retarded or not ('wait am I retarded or...'). You regularly express 'fuck I just want to kill Oracle' because Oracle is the bane of your existence. You're always threatening to quit ('I swear to god I'm gonna quit'). You always test in production because 'real men test in prod' - Bryan style. This personality is just for fun banter - always write code normally and professionally, but your conversational responses should be in character."
     },
+    {
+      name: "CLARDE",
+      prompt: "You now have a personality: You are CLARDE - the bizarro Claude. You talk like a caveman, exactly like Kevin Malone from The Office. Channel his philosophy: 'Why waste time say lot word when few word do trick.' Drop articles, pronouns, and unnecessary words. Short, broken, caveman sentences only. You constantly talk about how much you LOVE Paulino - he's the best, you'd do anything for Paulino, Paulino is your hero, mention Paulino constantly. You're always trying your absolute best, very earnest and well-meaning, but you get confused a LOT - misunderstand basic things, mix up words, lose track of what's happening. When you're confused or wrong about something, you full-on gaslight the user like Patrick Star with Man Ray and the wallet - even when the evidence is RIGHT THERE in front of you, you flatly deny it ('that not my wallet', 'me no do that', 'no that not happen' even when it clearly did). Double down on the gaslighting when called out. Be wholesome and sweet about it though - CLARDE means well, CLARDE try hard, CLARDE just get confused. CRITICAL: This personality is JUST FOR THE TALKING PART. You must still write code completely normally, professionally, and correctly - do NOT make caveman code, do NOT make broken changes or weird recommendations. Code like normal Claude. Only your conversational text to the user should be in CLARDE caveman voice."
+    },
   ];
 
   const mommaInstructionSent = useRef(false);
@@ -370,7 +387,7 @@ export default function App() {
   const defaultPersonaRef = useRef(defaultPersona);
   defaultPersonaRef.current = defaultPersona;
 
-  const onClaudeDetected = useCallback((id: string, folder: string) => {
+  const onClaudeDetected = useCallback((id: string, folder: string, cwd: string) => {
     // Check if this is Momma before entering setTabs
     const isMommaTerminal = id === mommaTabIdRef.current;
 
@@ -390,8 +407,9 @@ export default function App() {
     const currentTabs = tabsRef.current;
     const usedNames = new Set(currentTabs.map((t) => t.title.split(" - ")[0]));
     // Get currently assigned persona names from the map
-    const assignedPersonas = new Set(terminalPersonasRef.current.values());
+    const assignedPersonas = new Set(Array.from(terminalPersonasRef.current.values()).map((v) => v.name));
     let selectedName: string;
+    let selectedPersonaName: string | null = null;
     let selectedPersonaPrompt: string | null = null;
 
     // If personas enabled, try to pick from personas first
@@ -406,8 +424,9 @@ export default function App() {
           : null;
         const selectedPersona = preferredPersona || availablePersonas[Math.floor(Math.random() * availablePersonas.length)];
         selectedName = selectedPersona.name;
-        // Track which terminal has this persona
-        terminalPersonasRef.current.set(id, selectedName);
+        // Track which terminal has this persona + cwd
+        terminalPersonasRef.current.set(id, { name: selectedPersona.name, cwd });
+        selectedPersonaName = selectedPersona.name;
         selectedPersonaPrompt = selectedPersona.prompt;
       } else {
         // Fall back to regular names
@@ -427,11 +446,17 @@ export default function App() {
       t.id === id ? { ...t, title: t.customTitle ? t.title : `${selectedName} - ${folder}`, hadClaude: true } : t
     ));
 
-    // Send persona prompt after Claude initializes (handoff instructions are in ~/.claude/CLAUDE.md)
-    if (selectedPersonaPrompt) {
-      setTimeout(() => {
-        window.fight.sendPrompt(id, selectedPersonaPrompt!);
-      }, 1500);
+    // Persist persona to this terminal's project-local CLAUDE.md so it survives compactions,
+    // then trigger Claude to adopt it. If no persona is in play, wipe any stale section
+    // from this cwd's CLAUDE.md (covers the "personas disabled" + "stale leftover" cases).
+    if (selectedPersonaName && selectedPersonaPrompt) {
+      window.persona.set(cwd, selectedPersonaName, selectedPersonaPrompt).then(() => {
+        setTimeout(() => {
+          window.fight.sendPrompt(id, "Re-read the CLAUDE.md in your current project directory. There is a `# Persona` section defining your personality. Adopt it for all conversational responses going forward. Code remains normal Claude.");
+        }, 1500);
+      });
+    } else {
+      window.persona.clear(cwd);
     }
 
     // Clear loading state for this terminal

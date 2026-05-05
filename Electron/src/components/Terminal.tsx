@@ -8,7 +8,7 @@ interface TerminalProps {
   isActive: boolean;
   fontSize?: number;
   theme?: string;
-  onClaudeDetected?: (id: string, cwd: string) => void;
+  onClaudeDetected?: (id: string, folder: string, cwd: string) => void;
   onCwdChange?: (id: string, cwd: string) => void;
 }
 
@@ -194,7 +194,7 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
                 const cwd = match[0].trim();
                 const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
                 console.log("[Hivemind] Renaming terminal, matched path:", cwd, "-> folder:", folder);
-                onClaudeDetected(id, folder);
+                onClaudeDetected(id, folder, cwd);
                 break;
               }
             }
