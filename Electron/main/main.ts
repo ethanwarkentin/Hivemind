@@ -514,28 +514,45 @@ function sendPromptToTerminal(terminalId: string, text: string): void {
   }
 }
 
+// Stale detail-file sweeper: receivers read pointer .md files but don't have
+// to clean them up. Anything older than this gets purged on each poll.
+const HANDOFF_DETAIL_MAX_AGE_MS = 5 * 60 * 1000;
+
 // Poll for handoff files every 2 seconds
 setInterval(() => {
   try {
-    const files = fs.readdirSync(handoffDir).filter((f) => f.endsWith(".json"));
-    for (const file of files) {
+    const entries = fs.readdirSync(handoffDir);
+    const now = Date.now();
+    for (const file of entries) {
       const filePath = path.join(handoffDir, file);
-      try {
-        const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-        const { target, message } = content;
-        if (target && message) {
-          const targetId = resolveHandoffTarget(target);
-          if (targetId) {
-            console.log(`[Hivemind Handoff] "${target}" → terminal ${targetId}`);
-            sendPromptToTerminal(targetId, message);
-          } else {
-            console.warn(`[Hivemind Handoff] No terminal matching "${target}"`);
+      if (file.endsWith(".json")) {
+        try {
+          const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+          const { target, message } = content;
+          if (target && message) {
+            const targetId = resolveHandoffTarget(target);
+            if (targetId) {
+              console.log(`[Hivemind Handoff] "${target}" → terminal ${targetId}`);
+              sendPromptToTerminal(targetId, message);
+            } else {
+              console.warn(`[Hivemind Handoff] No terminal matching "${target}"`);
+            }
           }
+          fs.unlinkSync(filePath);
+        } catch {
+          // Bad file, delete it
+          try { fs.unlinkSync(filePath); } catch { /* ignore */ }
         }
-        fs.unlinkSync(filePath);
-      } catch {
-        // Bad file, delete it
-        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+      } else if (file.endsWith(".md")) {
+        // Sweep stale detail files - receivers don't clean these up
+        try {
+          const stats = fs.statSync(filePath);
+          if (now - stats.mtimeMs > HANDOFF_DETAIL_MAX_AGE_MS) {
+            fs.unlinkSync(filePath);
+          }
+        } catch {
+          // ignore
+        }
       }
     }
   } catch {
@@ -561,15 +578,16 @@ function getHivemindClaudeMd(): string {
 You are running inside **Hivemind**, a multi-terminal manager. Multiple Claude instances may be active simultaneously.
 
 ## Messaging other terminals
-When the user asks you to tell, send, or pass something to another terminal:
-1. Read \`${terminalsJsonPosix}\` to see the current list of terminal names
-2. Write a JSON file to \`${handoffDirPosix}/\` (any filename ending in .json) with this format:
-   \`\`\`json
-   {"target": "Full Terminal Name", "message": "your message here"}
-   \`\`\`
-3. The message will be delivered to that terminal as user input automatically.
+When the user asks you to tell, send, or pass something to another terminal, **always** use the two-file pointer pattern below. Never put the actual content in the JSON \`message\` field — it will be typed into the receiver's terminal stdin and may be truncated.
 
-**Keep \`message\` to a single line of plain text.** Newlines and control characters are stripped before delivery, so multi-line content will be mangled. For anything longer than a sentence or two — code snippets, multi-paragraph instructions, formatted data — write the full content to a \`.md\` file in \`${handoffDirPosix}/\` (the poller only reads \`.json\` files, so \`.md\` files are safe there) and send a short pointer message telling the receiver the exact absolute path to read.
+1. Read \`${terminalsJsonPosix}\` to see the current list of terminal names.
+2. Write the **full content** of your message to a markdown file in \`${handoffDirPosix}/\`. Name it \`<unix-timestamp>-<your-terminal-name>.md\` (e.g. \`1730000000-Claudakin.md\`). This file can contain anything: multi-line prose, code blocks, formatted data, etc.
+3. Write a JSON pointer file to \`${handoffDirPosix}/\` (any filename ending in \`.json\`) with this exact shape:
+   \`\`\`json
+   {"target": "Full Terminal Name", "message": "Read <absolute path to the .md file> and follow its instructions."}
+   \`\`\`
+   Keep the \`message\` short and on a single line — it is the only thing typed into the receiver's terminal.
+4. The receiver will pick up the pointer, read the .md file, and act on it. Stale .md files are auto-cleaned by Hivemind, so you don't need to delete anything yourself.
 
 Only do this when the user explicitly asks you to communicate with another terminal.
 ${HIVEMIND_SECTION_END}`;
@@ -701,6 +719,106 @@ ipcMain.handle("hivemind:disable", () => {
     // Clean up terminals.json
     try { fs.unlinkSync(terminalsJsonPath); } catch { /* ignore */ }
     store.set("hivemindEnabled", false);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+});
+
+// ── Claude Persona (project-local CLAUDE.md section management) ─────────────
+
+const PERSONA_SECTION_START = "# Persona";
+const PERSONA_SECTION_END = "# End Persona";
+
+function getPersonaSection(name: string, prompt: string): string {
+  return `${PERSONA_SECTION_START}
+You have an active personality assigned by Hivemind: **${name}**.
+
+${prompt}
+
+This personality persists across context compactions. Re-adopt it whenever you re-read this file.
+${PERSONA_SECTION_END}`;
+}
+
+function stripPersonaSection(content: string): string {
+  const startIdx = content.indexOf(PERSONA_SECTION_START);
+  const endIdx = content.indexOf(PERSONA_SECTION_END);
+  if (startIdx !== -1 && endIdx !== -1) {
+    content = content.slice(0, startIdx) + content.slice(endIdx + PERSONA_SECTION_END.length);
+    content = content.replace(/\n{3,}/g, "\n\n").trim();
+  }
+  return content;
+}
+
+function expandTilde(p: string): string {
+  if (!p) return p;
+  if (p === "~" || p.startsWith("~/") || p.startsWith("~\\")) {
+    return path.join(os.homedir(), p.slice(1));
+  }
+  return p;
+}
+
+function addPersonaToLocalClaudeMd(cwd: string, name: string, prompt: string): void {
+  cwd = expandTilde(cwd);
+  if (!cwd || !fs.existsSync(cwd)) return;
+  const filePath = path.join(cwd, "CLAUDE.md");
+  let content = "";
+  if (fs.existsSync(filePath)) {
+    content = fs.readFileSync(filePath, "utf-8");
+    content = stripPersonaSection(content);
+  }
+  const section = getPersonaSection(name, prompt);
+  content = content ? `${content.trim()}\n\n${section}\n` : `${section}\n`;
+  fs.writeFileSync(filePath, content);
+}
+
+function removePersonaFromLocalClaudeMd(cwd: string): void {
+  cwd = expandTilde(cwd);
+  if (!cwd) return;
+  const filePath = path.join(cwd, "CLAUDE.md");
+  if (!fs.existsSync(filePath)) return;
+  const original = fs.readFileSync(filePath, "utf-8");
+  const stripped = stripPersonaSection(original);
+  // If nothing changed, no persona section was present
+  if (stripped === original.trim() || stripped === original) return;
+  if (stripped) {
+    fs.writeFileSync(filePath, stripped + "\n");
+  } else {
+    // File only contained our persona section - remove it
+    fs.unlinkSync(filePath);
+  }
+}
+
+// One-time cleanup: previous Hivemind versions wrote the persona section to the
+// global ~/.claude/CLAUDE.md. Wipe any leftover section from there at startup.
+function purgeGlobalPersonaSection(): void {
+  if (!fs.existsSync(claudeMdPath)) return;
+  const original = fs.readFileSync(claudeMdPath, "utf-8");
+  const stripped = stripPersonaSection(original);
+  if (stripped !== original && stripped !== original.trim()) {
+    fs.writeFileSync(claudeMdPath, stripped ? stripped + "\n" : "");
+  }
+}
+purgeGlobalPersonaSection();
+
+// Refresh the Hivemind CLAUDE.md section on startup if Hivemind is enabled,
+// so existing users pick up updated handoff instructions without toggling.
+if (store.get("hivemindEnabled")) {
+  try { addHivemindToClaudeMd(); } catch { /* ignore */ }
+}
+
+ipcMain.handle("persona:set", (_event, args: { cwd: string; name: string; prompt: string }) => {
+  try {
+    addPersonaToLocalClaudeMd(args.cwd, args.name, args.prompt);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("persona:clear", (_event, args: { cwd: string }) => {
+  try {
+    removePersonaFromLocalClaudeMd(args.cwd);
     return { success: true };
   } catch (err) {
     return { success: false, error: String(err) };

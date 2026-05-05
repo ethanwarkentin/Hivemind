@@ -155,6 +155,16 @@ const handoffAPI: HandoffAPI = {
   disable: () => ipcRenderer.invoke("hivemind:disable"),
 };
 
+export interface PersonaAPI {
+  set: (cwd: string, name: string, prompt: string) => Promise<{ success: boolean; error?: string }>;
+  clear: (cwd: string) => Promise<{ success: boolean; error?: string }>;
+}
+
+const personaAPI: PersonaAPI = {
+  set: (cwd, name, prompt) => ipcRenderer.invoke("persona:set", { cwd, name, prompt }),
+  clear: (cwd) => ipcRenderer.invoke("persona:clear", { cwd }),
+};
+
 contextBridge.exposeInMainWorld("terminal", terminalAPI);
 contextBridge.exposeInMainWorld("settings", settingsAPI);
 contextBridge.exposeInMainWorld("hivemind", hivemindAPI);
@@ -162,3 +172,4 @@ contextBridge.exposeInMainWorld("electronUtils", utilsAPI);
 contextBridge.exposeInMainWorld("updater", updaterAPI);
 contextBridge.exposeInMainWorld("fight", fightAPI);
 contextBridge.exposeInMainWorld("handoff", handoffAPI);
+contextBridge.exposeInMainWorld("persona", personaAPI);
