@@ -639,12 +639,27 @@ function getHandoffAllowedTools(): string[] {
     `Read(${handoffTilde}/**)`,
     `Read(${handoffFwd}/*)`,
     `Read(${handoffTilde}/*)`,
+    // NOTE: no Write(...) rules — Claude Code only honors Edit(...) for file
+    // permission checks, and a single Edit rule covers all file-editing tools
+    // (Write, Edit, NotebookEdit). Emitting Write(...) here just produced a
+    // startup warning for every entry.
+    `Edit(${handoffFwd}/**)`,
+    `Edit(${handoffTilde}/**)`,
+  ];
+}
+
+// Legacy Write(...) handoff rules older builds wrote into settings.json.
+// getHandoffAllowedTools() no longer emits these, so we list them separately
+// to strip them on disable / re-enable and stop the startup warnings.
+function getLegacyHandoffTools(): string[] {
+  const home = os.homedir().replace(/\\/g, "/");
+  const handoffFwd = handoffDir.replace(/\\/g, "/");
+  const handoffTilde = handoffFwd.replace(home, "~");
+  return [
     `Write(${handoffFwd}/**)`,
     `Write(${handoffTilde}/**)`,
     `Write(${handoffFwd}/*)`,
     `Write(${handoffTilde}/*)`,
-    `Edit(${handoffFwd}/**)`,
-    `Edit(${handoffTilde}/**)`,
   ];
 }
 
@@ -660,7 +675,11 @@ function addHivemindToClaudeSettings(): void {
   }
   // Claude Code uses permissions.allow for auto-approved tools
   const permissions = (settings.permissions as Record<string, unknown>) || {};
-  const allowed = (permissions.allow as string[]) || [];
+  let allowed = (permissions.allow as string[]) || [];
+  // Purge any legacy Write(...) handoff rules from older builds first so
+  // re-enabling Hivemind self-heals settings that trigger startup warnings.
+  const legacy = new Set(getLegacyHandoffTools());
+  allowed = allowed.filter((t: string) => !legacy.has(t));
   const hivemindTools = getHandoffAllowedTools();
   for (const tool of hivemindTools) {
     if (!allowed.includes(tool)) {
@@ -682,7 +701,7 @@ function removeHivemindFromClaudeSettings(): void {
   } catch { return; }
   const permissions = (settings.permissions as Record<string, unknown>) || {};
   const allowed = (permissions.allow as string[]) || [];
-  const hivemindTools = new Set(getHandoffAllowedTools());
+  const hivemindTools = new Set([...getHandoffAllowedTools(), ...getLegacyHandoffTools()]);
   permissions.allow = allowed.filter((t: string) => !hivemindTools.has(t));
   settings.permissions = permissions;
   // Clean up old allowedTools field if present from previous version
