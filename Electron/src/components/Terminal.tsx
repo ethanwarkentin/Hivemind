@@ -180,23 +180,34 @@ export default function Terminal({ id, isActive, fontSize = 14, theme = "dark", 
           //   Opus 4.6 · Claude Team
           //   ~\Boswell\Projects\Terradome
           if (/claude\s*code\s*v?\d+\.\d+/i.test(stripped)) {
-            // Try multiple path patterns
+            // Try multiple path patterns (global so we can inspect every
+            // candidate, not just the first one in the buffer).
             const patterns = [
-              /~[\\\/][\w.\\\/ -]+/,                    // ~\path or ~/path
-              /[A-Z]:[\\\/][\w.\\\/ -]+/,               // C:\path
-              /\/[a-z]\/[\w.\\\/ -]+/,                   // /c/Users/...
+              /~[\\\/][\w.\\\/ -]+/g,                    // ~\path or ~/path
+              /[A-Z]:[\\\/][\w.\\\/ -]+/g,               // C:\path
+              /\/[a-z]\/[\w.\\\/ -]+/g,                   // /c/Users/...
             ];
 
+            // Hivemind's own handoff dir (…/hivemind/handoffs/…) shows up in
+            // handoff scrollback. Without this guard it gets scraped as the
+            // "folder", producing the bogus "<name> - handoffs" title.
+            const isHivemindPath = (p: string) =>
+              /hivemind[\\\/](-dev[\\\/])?handoffs/i.test(p) ||
+              /[\\\/]handoffs[\\\/]?$/i.test(p);
+
+            let cwd: string | null = null;
             for (const pattern of patterns) {
-              const match = stripped.match(pattern);
-              if (match) {
-                claudeDetectedRef.current = true;
-                const cwd = match[0].trim();
-                const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
-                console.log("[Hivemind] Renaming terminal, matched path:", cwd, "-> folder:", folder);
-                onClaudeDetected(id, folder, cwd);
-                break;
-              }
+              const matches = stripped.match(pattern);
+              if (!matches) continue;
+              cwd = matches.map((m) => m.trim()).find((m) => !isHivemindPath(m)) || null;
+              if (cwd) break;
+            }
+
+            if (cwd) {
+              claudeDetectedRef.current = true;
+              const folder = cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || cwd;
+              console.log("[Hivemind] Renaming terminal, matched path:", cwd, "-> folder:", folder);
+              onClaudeDetected(id, folder, cwd);
             }
           }
         }
